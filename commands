@@ -1,3 +1,5 @@
+MODEL 6 (ATTINY861A), VERSION 1, REVISION 0
+
 *** COMMANDS ***
 
 	byte	command (see below)
@@ -15,6 +17,7 @@
 									1	1	1		0x07	i/o 7
 
 			0	0	0	0	0		0	0	0		0x00	identify, returns: 0x4a 0xfb AA BB CC {DD} where AA=numeric device id, BB=firmware version, CC=firmware revision, DD=ascii id string
+															= 0x4a 0xfb 0x06 0x01 0x00 attiny861_1
 			0	0	0	0	0		0	0	1		0x01	read adc, returns 2 bytes
 			0	0	0	0	0		0	1	0		0x02	timer0 counter, returns 1 byte
 			0	0	0	0	0		0	1	1		0x03	timer1 counter, returns 2 bytes
@@ -46,7 +49,6 @@
 			1	1	1	1	0		1	1	0		0xf6	twi stats - read local frames			returns AA BB as msb lsb.
 			1	1	1	1	0		1	1	1		0xf7	twi stats - read idle calls				returns AA BB as msb lsb.
 
-
 	softpwm mode =
 			0	on
 			1	fade in
@@ -71,61 +73,27 @@
 			6	internal error
 			7	not implemented
 
-*** MODELS ***
+*** FEATURES ***
 
-	MODEL 6 (ATTINY861A), VERSION 1, REVISION 0
+	pin		name		isp			function
 
-		counters:
-
-			0	b6
-			1	a6
-
-		inputs:
-
-			0	b6
-			1	a6
-
-		outputs/softpwm
-
-			0	b2 (shared sck)
-			1	b4
-			2	a3
-			3	a4
-
-		pwms:
-
-			0	b1 (oc1a) (shared miso)
-			1	b3 (oc1b)
-			2	b5 (oc1d)
-
-		adcs:
-
-			0	a7
-			1	temperature
-
-		commands
-
-			0x00	identify
-			0x01	read adc	
-			0x02	timer0 counter
-			0x03	timer1 counter
-			0x1x	read counter
-			0x2x	read / reset counter
-			0x3x	read input
-			0x4x	write output / softpwm
-			0x5x	read output / softpwm
-			0x6x	write softpwm mode
-			0x7x	read softpwm mode
-			0x8x	write pwm
-			0x9x	read pwm
-			0xax	write pwm mode
-			0xbx	read pwm mode
-			0xc0	start adc conversion
-			0xf0	twi stats - disable
-			0xf1	twi stats - enable
-			0xf2	twi stats - read start conditions
-			0xf3	twi stats - read stop conditions
-			0xf4	twi stats - read error conditions
-			0xf5	twi stats - read overflow conditions
-			0xf6	twi stats - read local frames
-			0xf7	twi stats - read idle calls
+	1		pb0			mosi 		pcint8 = input 2
+	2		pb1			miso 		oc1a = pwm 0
+	3		pb2			sck 		pb2 = output 0
+	4		pb3						oc1b = pwm 1
+	5		Vcc			Vcc
+	6		GND			GND
+	7		pb4						pb4 = output 1
+	8		pb5						oc1d = pwm 2
+	9		pb6						pcint14 = input 0
+	10		reset		reset
+	11		pa7						adc6 = adc 0
+	12		pa6						pcint6 = input 1
+	13		pa5						[adc4/ain2/pcint5]
+	14		pa4						pa4 = output 3
+	15		AVcc
+	16		AGND
+	17		pa3						pa3 = output 2
+	18		pa2						scl
+	19		pa1						pcint1 = input 3
+	20		pa0						sda

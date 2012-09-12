@@ -41,7 +41,7 @@ static	const	pwmport_t		*pwmport;
 static			pwm_meta_t		softpwm_meta[OUTPUT_PORTS];
 static			pwm_meta_t		pwm_meta[PWM_PORTS];
 static			pwm_meta_t		*pwm_slot;
-static			counter_meta_t	counters_meta[COUNTER_PORTS];
+static			counter_meta_t	counters_meta[INPUT_PORTS];
 
 static	uint8_t		slot, dirty, duty, next_duty, diff;
 static	uint8_t		timer0_value, timer0_debug_1, timer0_debug_2;
@@ -244,23 +244,9 @@ ISR(TIMER0_COMPB_vect) // timer 0 softpwm trigger
 
 ISR(PCINT_vect)
 {
-	uint8_t port[2];
-
-	port[0] = *counter_ports[0].port & _BV(counter_ports[0].bit);
-	port[1] = *counter_ports[1].port & _BV(counter_ports[1].bit);
-
-	if(!port[0] && !port[1])
-	{
-		counters_meta[0].counter = 0;
-		counters_meta[1].counter = 0;
-		return;
-	}
-
-	if(!port[0])
-		counters_meta[0].counter++;
-
-	if(!port[1])
-		counters_meta[1].counter++;
+	for(slot = 0; slot < INPUT_PORTS; slot++)
+		if(!(*(input_ports[slot].port) & _BV(input_ports[slot].bit)))
+			counters_meta[slot].counter++;
 }
 
 static void update_static_softpwm_ports(void)
@@ -413,7 +399,7 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 		case(0x10):	// 0x10 read counter
 		case(0x20): // 0x20 read / reset counter
 		{
-			if(io >= COUNTER_PORTS)
+			if(io >= INPUT_PORTS)
 				return(build_reply(output_buffer_length, output_buffer, input, 3, 0, 0));
 
 			uint32_t counter = counters_meta[io].counter;
@@ -642,9 +628,9 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 
 int main(void)
 {
-	PCMSK0 = _BV(PCINT6);	//	PCINT on pa6
-	PCMSK1 = _BV(PCINT14);	//	PCINT on pb6
-	GIMSK  = _BV(PCIE1);	//	enable PCINT
+	PCMSK0 = _BV(PCINT1) | _BV(PCINT6);		//	PCINT on pa1 / pa6
+	PCMSK1 = _BV(PCINT8) | _BV(PCINT14);	//	PCINT on pb0 / pb6
+	GIMSK  = _BV(PCIE1)  | _BV(PCIE0);		//	enable PCINT[7:0]/[15:12] and PCINT[11:8]
 
 	PRR =		(0 << 7)		|
 				(0 << 6)		|	// reserved
@@ -654,8 +640,6 @@ int main(void)
 				(0 << PRTIM0)	|	// timer0
 				(0 << PRUSI)	|	// usi
 				(0 << PRADC);		// adc / analog comperator
-
-	uint8_t slot;
 
 	DDRA = 0;
 	DDRB = 0;
@@ -675,7 +659,7 @@ int main(void)
 	for(slot = 0; slot < PWM_PORTS; slot++)
 		pwm_meta[slot].pwm_mode	= pwm_mode_none;
 
-	for(slot = 0; slot < COUNTER_PORTS; slot++)
+	for(slot = 0; slot < INPUT_PORTS; slot++)
 		counters_meta[slot].counter = 0;
 
 	for(slot = 0; slot < OUTPUT_PORTS; slot++)
