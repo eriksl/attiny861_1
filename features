@@ -56,7 +56,7 @@ MODEL 6 (ATTINY861A), VERSION 1, REVISION 0
 			3	fade in/out
 
 *** REPLY ***
-	
+
 	byte	length of reply minus this length byte
 	byte	error code
 	byte	command this reply relates to
@@ -75,25 +75,25 @@ MODEL 6 (ATTINY861A), VERSION 1, REVISION 0
 
 *** FEATURES ***
 
-	pin		name		isp			function
+	pin		name		isp			function			connection
 
-	1		pb0			mosi 		pcint8 = input 2
-	2		pb1			miso 		oc1a = pwm 0
-	3		pb2			sck 		pb2 = output 0
-	4		pb3						oc1b = pwm 1
+	1		pb0			mosi 		pcint8 = input 2	input 2
+	2		pb1			miso 		oc1a = pwm 0		output 0
+	3		pb2			sck 		pb2 = output 0		output 3
+	4		pb3						oc1b = pwm 1		output 1
 	5		Vcc			Vcc
 	6		GND			GND
-	7		pb4						pb4 = output 1
-	8		pb5						oc1d = pwm 2
-	9		pb6						pcint14 = input 0
-	10		reset		reset
-	11		pa7						adc6 = adc 0
-	12		pa6						pcint6 = input 1
-	13		pa5						[adc4/ain2/pcint5]
-	14		pa4						pa4 = output 3
+	7		pb4						pb4 = output 1		i2c command led
+	8		pb5						oc1d = pwm 2		output 2
+	9		pb6						pcint14 = input 0	input 0
+	10		pb7			reset
+	11		pa7						adc6 = adc 0		not connected
+	12		pa6						pcint6 = input 1	input 1
+	13		pa5						[adc4/ain2/pcint5]	not connected
+	14		pa4						pa4 = output 3		not connected
 	15		AVcc
 	16		AGND
-	17		pa3						pa3 = output 2
+	17		pa3						pa3 = output 2		input sense led
 	18		pa2						scl
-	19		pa1						pcint1 = input 3
+	19		pa1						pcint1 = input 3	input 3
 	20		pa0						sda
