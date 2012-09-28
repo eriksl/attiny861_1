@@ -44,6 +44,7 @@ static			counter_meta_t	counters_meta[INPUT_PORTS];
 
 static	uint8_t		slot, dirty, duty, next_duty, diff;
 static	uint8_t		timer0_value, timer0_debug_1, timer0_debug_2;
+static	uint8_t		i2c_sense_led, input_sense_led;
 static	uint16_t	duty16, diff16;
 
 static	void update_static_softpwm_ports(void);
@@ -174,6 +175,18 @@ ISR(WDT_vect)
 		pwm_slot++;
 	}
 
+	if(i2c_sense_led == 1)
+		*output_ports[1].port &= ~_BV(output_ports[1].bit);
+
+	if(i2c_sense_led > 0)
+		i2c_sense_led--;
+
+	if(input_sense_led == 1)
+		*output_ports[2].port &= ~_BV(output_ports[2].bit);
+
+	if(input_sense_led > 0)
+		input_sense_led--;
+
 	watchdog_setup(WATCHDOG_PRESCALER);
 }
 
@@ -243,9 +256,22 @@ ISR(TIMER0_COMPB_vect) // timer 0 softpwm trigger
 
 ISR(PCINT_vect)
 {
+	dirty = 0;
+
 	for(slot = 0; slot < INPUT_PORTS; slot++)
+	{
 		if(!(*(input_ports[slot].port) & _BV(input_ports[slot].bit)))
+		{
 			counters_meta[slot].counter++;
+			dirty = 1;
+		}
+	}
+
+	if(dirty)
+	{
+		*output_ports[2].port |= _BV(output_ports[2].bit);
+		input_sense_led = 16;
+	}
 }
 
 static void update_static_softpwm_ports(void)
@@ -291,6 +317,9 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 	uint8_t input;
 	uint8_t	command;
 	uint8_t	io;
+
+	*output_ports[1].port |= _BV(output_ports[1].bit);
+	i2c_sense_led = 16;
 
 	if(input_buffer_length < 1)
 		return(build_reply(output_buffer_length, output_buffer, 0, 1, 0, 0));
