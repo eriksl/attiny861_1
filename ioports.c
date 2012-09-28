@@ -17,18 +17,18 @@ const adcport_t adc_ports[ADC_PORTS] =
 
 const ioport_t input_ports[INPUT_PORTS] =
 {
-	{ &PINB, &DDRB, 6 },
-	{ &PINA, &DDRA, 6 },
-	{ &PINB, &DDRB, 0 },
-	{ &PINA, &DDRA, 1 }
+	{ &PORTB, &PINB, &DDRB, 6 },
+	{ &PORTA, &PINA, &DDRA, 6 },
+	{ &PORTB, &PINB, &DDRB, 0 },
+	{ &PORTA, &PINA, &DDRA, 1 }
 };
 
 const ioport_t output_ports[OUTPUT_PORTS] =
 {
-	{ &PORTB, &DDRB, 2 },
-	{ &PORTB, &DDRB, 4 },
-	{ &PORTA, &DDRA, 3 },
-	{ &PORTA, &DDRA, 4 }
+	{ &PORTB, &PINB, &DDRB, 2 },
+	{ &PORTB, &PINB, &DDRB, 4 },
+	{ &PORTA, &PINA, &DDRA, 3 },
+	{ &PORTA, &PINA, &DDRA, 4 }
 };
 
 const pwmport_t pwm_ports[PWM_PORTS] =

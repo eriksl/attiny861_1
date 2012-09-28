@@ -260,7 +260,7 @@ ISR(PCINT_vect)
 
 	for(slot = 0; slot < INPUT_PORTS; slot++)
 	{
-		if(!(*(input_ports[slot].port) & _BV(input_ports[slot].bit)))
+		if(!(*(input_ports[slot].pin) & _BV(input_ports[slot].bit)))
 		{
 			counters_meta[slot].counter++;
 			dirty = 1;
@@ -452,7 +452,7 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 			if(io >= INPUT_PORTS)
 				return(build_reply(output_buffer_length, output_buffer, input, 3, 0, 0));
 
-			value = !!(*input_ports[io].port & (1 << input_ports[io].bit));
+			value = !!(*input_ports[io].pin & (1 << input_ports[io].bit));
 
 			return(build_reply(output_buffer_length, output_buffer, input, 0, 1, &value));
 		}
@@ -673,7 +673,12 @@ int main(void)
 	DDRB = 0;
 
 	for(slot = 0; slot < INPUT_PORTS; slot++)
+	{
+		*input_ports[slot].port		&= ~_BV(input_ports[slot].bit);
+		*input_ports[slot].ddr		&= ~_BV(input_ports[slot].bit);
+		*input_ports[slot].port		|= _BV(input_ports[slot].bit);
 		counters_meta[slot].counter = 0;
+	}
 
 	for(slot = 0; slot < OUTPUT_PORTS; slot++)
 	{

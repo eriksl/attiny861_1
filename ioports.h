@@ -12,6 +12,7 @@ typedef struct
 typedef struct
 {
 	volatile	uint8_t		*port;
+	volatile	uint8_t		*pin;
 	volatile	uint8_t		*ddr;
 				uint8_t		bit;
 } ioport_t;
