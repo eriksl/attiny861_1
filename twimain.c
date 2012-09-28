@@ -37,7 +37,6 @@ typedef struct
 } counter_meta_t;
 
 static	const	ioport_t		*ioport;
-static	const	pwmport_t		*pwmport;
 static			pwm_meta_t		softpwm_meta[OUTPUT_PORTS];
 static			pwm_meta_t		pwm_meta[PWM_PORTS];
 static			pwm_meta_t		*pwm_slot;
@@ -644,50 +643,36 @@ int main(void)
 	DDRA = 0;
 	DDRB = 0;
 
-	for(slot = 0; slot < OUTPUT_PORTS; slot++)
-		*output_ports[slot].ddr |= _BV(output_ports[slot].bit);
-
-	for(slot = 0; slot < PWM_PORTS; slot++)
-		*pwm_ports[slot].ddr |= _BV(pwm_ports[slot].bit);
-
-	for(slot = 0; slot < OUTPUT_PORTS; slot++)
-	{
-		softpwm_meta[slot].duty		= 0;
-		softpwm_meta[slot].pwm_mode	= pwm_mode_none;
-	}
-
-	for(slot = 0; slot < PWM_PORTS; slot++)
-		pwm_meta[slot].pwm_mode	= pwm_mode_none;
-
 	for(slot = 0; slot < INPUT_PORTS; slot++)
 		counters_meta[slot].counter = 0;
 
 	for(slot = 0; slot < OUTPUT_PORTS; slot++)
 	{
-		ioport = &output_ports[slot];
-		*ioport->port |= _BV(ioport->bit);
-		_delay_ms(50);
+		*output_ports[slot].ddr		|= _BV(output_ports[slot].bit);
+		*output_ports[slot].port	&= ~_BV(output_ports[slot].bit);
+		softpwm_meta[slot].duty		= 0;
+		softpwm_meta[slot].pwm_mode	= pwm_mode_none;
 	}
 
-	for(slot = 0; slot < OUTPUT_PORTS; slot++)
+	for(slot = 0; slot < PWM_PORTS; slot++)
+	{
+		*pwm_ports[slot].ddr 		|= _BV(pwm_ports[slot].bit);
+		*pwm_ports[slot].port		&= ~_BV(pwm_ports[slot].bit);
+		pwm_meta[slot].pwm_mode		= pwm_mode_none;
+	}
+
+	for(slot = 1; slot < OUTPUT_PORTS; slot++)
+	{
+		ioport = &output_ports[slot];
+		*ioport->port |= _BV(ioport->bit);
+		_delay_ms(100);
+	}
+
+	for(slot = 1; slot < OUTPUT_PORTS; slot++)
 	{
 		ioport = &output_ports[slot];
 		*ioport->port &= ~_BV(ioport->bit);
-		_delay_ms(50);
-	}
-
-	for(slot = 0; slot < PWM_PORTS; slot++)
-	{
-		pwmport = &pwm_ports[slot];
-		*pwmport->port |= _BV(pwmport->bit);
-		_delay_ms(50);
-	}
-
-	for(slot = 0; slot < PWM_PORTS; slot++)
-	{
-		pwmport = &pwm_ports[slot];
-		*pwmport->port &= ~_BV(pwmport->bit);
-		_delay_ms(50);
+		_delay_ms(100);
 	}
 
 	adc_init();
