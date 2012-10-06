@@ -3,8 +3,6 @@
 timeout=0.1
 flushcount=2
 
-testcase=3
-
 exec 6<> /dev/ttyUSB1
 
 function flush ()
@@ -17,10 +15,7 @@ function flush ()
 
 		if [ -n "${reply[*]}" ]
 		then
-#if [ ${reply[1]} != "FD" ]
-#			then
 				echo "${reply[*]}"
-#			fi
 		fi
 	done
 }
@@ -31,54 +26,21 @@ function send ()
 	flush
 }
 
-echo "s 04 p" >&6
-flush
+send "s 04 p"
 
-case $testcase in
-	1)
-		while true
-		do
-			for io in 0 1 2 3 2 1
-			do
-				command="8${io}"
-
-				echo "s 04 ${command} 01 p" >&6
-				flush
-				echo "r 00 p" >&6
-				flush
-				echo "w ${command} 00 p" >&6
-				flush
-				echo "r 00 p" >&6
-				flush
-			done
-		done
-	;;
-
-	2)
-		while true
-		do
-			for ((pwm = 1; pwm < 1024; pwm += 50))
-			do
-				printf "w 80 %04x p\n" $[((pwm + 0) & 1023)] >&6
-				flush
-
-				printf "w 81 %04x p\n" $[((1024 - pwm) & 1023)] >&6
-				flush
-
-				printf "w 82 %04x p\n" $[((512 - pwm) & 1023)] >&6
-				flush
-
-				usleep 20000
-			done
-		done
-	;;
-
-	3)
-		send "w 00 p r 00 p"
-		send "w 40 01 p r 00 p"
-		send "w 41 02 p r 00 p"
-		send "w 42 03 p r 00 p"
-		send "w 43 04 p r 00 p"
-		#send "w 60 03 p r 00 p"
-	;;
-esac
+while true
+do
+	clear
+#	send "w c0 p r 00 p w 01 p r 00 p"
+#	send "w c1 p r 00 p w 01 p r 00 p"
+#	send "w c2 p r 00 p w 01 p r 00 p"
+#	send "w 10 p r 00 p"
+#	send "w 11 p r 00 p"
+#	send "w 12 p r 00 p"
+#	send "w 13 p r 00 p"
+	send "w 30 p r 00 p"
+	send "w 31 p r 00 p"
+	send "w 32 p r 00 p"
+	send "w 33 p r 00 p"
+	usleep 100000
+done

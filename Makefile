@@ -38,7 +38,7 @@ watchdog.o:					watchdog.h
 usitwislave/usitwislave.o:	usitwislave/usitwislave.h usitwislave/usitwislave_devices.h 
 
 $(ELFFILE):			$(OBJFILES)
-					@echo "LD $< -> $@"
+					@echo "LD $(OBJFILES) -> $@"
 					@avr-gcc $(LDFLAGS) $(OBJFILES) -o $@
 
 $(HEXFILE):			$(ELFFILE)
