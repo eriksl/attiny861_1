@@ -33,10 +33,13 @@ const ioport_t input_ports[INPUT_PORTS] =
 
 const ioport_t output_ports[OUTPUT_PORTS] =
 {
-	{ &PORTB, &PINB, &DDRB, 2 },
-	{ &PORTB, &PINB, &DDRB, 4 },
-	{ &PORTA, &PINA, &DDRA, 3 },
-	{ &PORTA, &PINA, &DDRA, 4 }
+	{ &PORTB, &PINB, &DDRB, 2 }		// b2
+};
+
+const ioport_t internal_output_ports[INTERNAL_OUTPUT_PORTS] =
+{
+	{ &PORTB, &PINB, &DDRB, 4 },	// b4
+	{ &PORTA, &PINA, &DDRA, 3 },	// a3
 };
 
 const pwmport_t pwm_ports[PWM_PORTS] =

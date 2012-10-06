@@ -36,15 +36,17 @@ typedef struct
 
 enum
 {
-	ADC_PORTS		= 2,
-	INPUT_PORTS		= 4,
-	OUTPUT_PORTS	= 4,
-	PWM_PORTS		= 3
+	ADC_PORTS				= 4,
+	INPUT_PORTS				= 4,
+	OUTPUT_PORTS			= 1,
+	INTERNAL_OUTPUT_PORTS	= 2,
+	PWM_PORTS				= 3
 };
 
 extern const adcport_t	adc_ports[];
 extern const ioport_t	input_ports[];
 extern const ioport_t	output_ports[];
+extern const ioport_t	internal_output_ports[];
 extern const pwmport_t	pwm_ports[];
 
 #endif

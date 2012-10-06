@@ -176,13 +176,13 @@ ISR(WDT_vect)
 	}
 
 	if(i2c_sense_led == 1)
-		*output_ports[1].port &= ~_BV(output_ports[1].bit);
+		*internal_output_ports[0].port &= ~_BV(internal_output_ports[0].bit);
 
 	if(i2c_sense_led > 0)
 		i2c_sense_led--;
 
 	if(input_sense_led == 1)
-		*output_ports[2].port &= ~_BV(output_ports[2].bit);
+		*internal_output_ports[1].port &= ~_BV(internal_output_ports[1].bit);
 
 	if(input_sense_led > 0)
 		input_sense_led--;
@@ -269,8 +269,8 @@ ISR(PCINT_vect)
 
 	if(dirty)
 	{
-		*output_ports[2].port |= _BV(output_ports[2].bit);
-		input_sense_led = 16;
+		*internal_output_ports[1].port |= _BV(internal_output_ports[1].bit);
+		input_sense_led = 48;
 	}
 }
 
@@ -318,8 +318,8 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 	uint8_t	command;
 	uint8_t	io;
 
-	*output_ports[1].port |= _BV(output_ports[1].bit);
-	i2c_sense_led = 16;
+	*internal_output_ports[0].port |= _BV(internal_output_ports[0].bit);
+	i2c_sense_led = 4;
 
 	if(input_buffer_length < 1)
 		return(build_reply(output_buffer_length, output_buffer, 0, 1, 0, 0));
@@ -692,6 +692,14 @@ int main(void)
 		softpwm_meta[slot].pwm_mode	= pwm_mode_none;
 	}
 
+	for(slot = 0; slot < INTERNAL_OUTPUT_PORTS; slot++)
+	{
+		ioport = &internal_output_ports[slot];
+
+		*ioport->ddr	|= _BV(ioport->bit);
+		*ioport->port	&= ~_BV(ioport->bit);
+	}
+
 	for(slot = 0; slot < PWM_PORTS; slot++)
 	{
 		*pwm_ports[slot].ddr 		|= _BV(pwm_ports[slot].bit);
@@ -699,18 +707,43 @@ int main(void)
 		pwm_meta[slot].pwm_mode		= pwm_mode_none;
 	}
 
-	for(slot = 1; slot < OUTPUT_PORTS; slot++)
+	for(duty = 0; duty < 3; duty++)
 	{
-		ioport = &output_ports[slot];
-		*ioport->port |= _BV(ioport->bit);
-		_delay_ms(100);
-	}
+		for(slot = 0; slot < INTERNAL_OUTPUT_PORTS; slot++)
+		{
+			ioport = &internal_output_ports[slot];
 
-	for(slot = 1; slot < OUTPUT_PORTS; slot++)
-	{
-		ioport = &output_ports[slot];
-		*ioport->port &= ~_BV(ioport->bit);
-		_delay_ms(100);
+			*ioport->port |= _BV(ioport->bit);
+			_delay_ms(100);
+		}
+
+		for(slot = 0; slot < INTERNAL_OUTPUT_PORTS; slot++)
+		{
+			ioport = &internal_output_ports[slot];
+
+			*ioport->port &= ~_BV(ioport->bit);
+			_delay_ms(100);
+		}
+
+		_delay_ms(150);
+
+		for(slot = INTERNAL_OUTPUT_PORTS; slot > 0; slot--)
+		{
+			ioport = &internal_output_ports[slot - 1];
+
+			*ioport->port |= _BV(ioport->bit);
+			_delay_ms(100);
+		}
+
+		for(slot = INTERNAL_OUTPUT_PORTS; slot > 0; slot--)
+		{
+			ioport = &internal_output_ports[slot - 1];
+
+			*ioport->port &= ~_BV(ioport->bit);
+			_delay_ms(100);
+		}
+
+		_delay_ms(150);
 	}
 
 	adc_init();
