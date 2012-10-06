@@ -5,11 +5,11 @@
 
 void adc_init(void)
 {
-	ACSRA =		(1 << ACD)		|	// disable comperator
+	ACSRA =		(1 << ACD)		|	// disable comparator
 				(0 << ACBG)		|	// bandgap select (n/a)
-				(0 << ACO)		|	// enable analog comperator output
-				(1 << ACI)		|	// clear comperator interrupt flag
-				(0 << ACIE)		|	// enable analog comperator interrupt
+				(0 << ACO)		|	// enable analog comparator output
+				(1 << ACI)		|	// clear comparator interrupt flag
+				(0 << ACIE)		|	// enable analog comparator interrupt
 				(0 << ACME)		|	// use adc multiplexer
 				(0 << ACIS1)	|	// interrupt mode select (n/a)
 				(0 << ACIS0);
@@ -19,9 +19,9 @@ void adc_init(void)
 				(0 << 5)		|
 				(0 << 4)		|
 				(0 << 3)		|
-				(0 << ACM0)		|	// analog comperator multiplexer (n/a)
-				(0 << ACM1)		|	// analog comperator multiplexer (n/a)
-				(0 << ACM2);		// analog comperator multiplexer (n/a)
+				(0 << ACM0)		|	// analog comparator multiplexer (n/a)
+				(0 << ACM1)		|	// analog comparator multiplexer (n/a)
+				(0 << ACM2);		// analog comparator multiplexer (n/a)
 
 
 	DIDR0 = 	(1 << ADC6D)	|	// disable digital input adc6

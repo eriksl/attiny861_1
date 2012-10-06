@@ -5,7 +5,7 @@
 
 const adcport_t adc_ports[ADC_PORTS] = 
 {
-	{							// pa7
+	{							// pa7 pin 11
 		{ 0, 0, 0 },			// Vref = Vcc
 		{ 0, 1, 1, 0, 0, 0 },	// mux = adc6
 	},
