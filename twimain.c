@@ -656,10 +656,6 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 
 int main(void)
 {
-	PCMSK0 = _BV(PCINT1) | _BV(PCINT6);		//	PCINT on pa1 / pa6
-	PCMSK1 = _BV(PCINT8) | _BV(PCINT14);	//	PCINT on pb0 / pb6
-	GIMSK  = _BV(PCIE1)  | _BV(PCIE0);		//	enable PCINT[7:0]/[15:12] and PCINT[11:8]
-
 	PRR =		(0 << 7)		|
 				(0 << 6)		|	// reserved
 				(0 << 5)		|
@@ -669,14 +665,22 @@ int main(void)
 				(0 << PRUSI)	|	// usi
 				(0 << PRADC);		// adc / analog comperator
 
-	DDRA = 0;
-	DDRB = 0;
+	DDRA	= 0;
+	DDRB	= 0;
+	GIMSK	= 0;
+	PCMSK0	= 0;
+	PCMSK1	= 0;
 
 	for(slot = 0; slot < INPUT_PORTS; slot++)
 	{
-		*input_ports[slot].port		&= ~_BV(input_ports[slot].bit);
-		*input_ports[slot].ddr		&= ~_BV(input_ports[slot].bit);
-		*input_ports[slot].port		|= _BV(input_ports[slot].bit);
+		ioport = &input_ports[slot];
+
+		*ioport->port		&= ~_BV(ioport->bit);
+		*ioport->ddr		&= ~_BV(ioport->bit);
+		*ioport->port		|= _BV(ioport->bit);
+		*ioport->pcmskreg	|= _BV(ioport->pcmskbit);
+		GIMSK				|= _BV(ioport->gimskbit);
+
 		counters_meta[slot].counter = 0;
 	}
 

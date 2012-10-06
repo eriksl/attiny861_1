@@ -15,6 +15,9 @@ typedef struct
 	volatile	uint8_t		*pin;
 	volatile	uint8_t		*ddr;
 				uint8_t		bit;
+	volatile	uint8_t		*pcmskreg;
+				uint8_t		pcmskbit;
+				uint8_t		gimskbit;
 } ioport_t;
 
 typedef struct
