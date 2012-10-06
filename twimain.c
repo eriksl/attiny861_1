@@ -348,7 +348,7 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 
 				case(0x01):	// 0x02 read ADC
 				{
-					uint8_t value;
+					uint16_t value;
 
 					value = ADCW;
 
@@ -577,7 +577,7 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 
 		case(0xc0):	// start adc conversion
 		{
-			if(io > 1)
+			if(io >= ADC_PORTS)
 				return(build_reply(output_buffer_length, output_buffer, input, 3, 0, 0));
 
 			adc_start(io);
