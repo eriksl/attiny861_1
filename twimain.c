@@ -686,8 +686,10 @@ int main(void)
 
 	for(slot = 0; slot < OUTPUT_PORTS; slot++)
 	{
-		*output_ports[slot].ddr		|= _BV(output_ports[slot].bit);
-		*output_ports[slot].port	&= ~_BV(output_ports[slot].bit);
+		ioport = &output_ports[slot];
+
+		*ioport->ddr	|= _BV(ioport->bit);
+		*ioport->port	&= ~_BV(ioport->bit);
 		softpwm_meta[slot].duty		= 0;
 		softpwm_meta[slot].pwm_mode	= pwm_mode_none;
 	}
