@@ -9,6 +9,14 @@ const adcport_t adc_ports[ADC_PORTS] =
 		{ 0, 0, 0 },			// Vref = Vcc
 		{ 0, 1, 1, 0, 0, 0 },	// mux = adc6
 	},
+	{							// pa5 pin 13
+		{ 0, 0, 0 },			// Vref = Vcc
+		{ 0, 0, 1, 0, 0, 0 },	// mux = adc4
+	},
+	{							// pa4 pin 14
+		{ 0, 0, 0 },			// Vref = Vcc
+		{ 1, 1, 0, 0, 0, 0 },	// mux = adc3
+	},
 	{							// internal temp sensor
 		{ 0, 1, 0, },			// Vref = internal 1.1V reference
 		{ 1, 1, 1, 1, 1, 1 }	// mux = adc11
