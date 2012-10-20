@@ -543,8 +543,9 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 			softpwm_meta[io].duty = input_buffer[1];
 			update_static_softpwm_ports();
 			timer0_start();
+			duty = softpwm_meta[io].duty;
 
-			return(build_reply(output_buffer_length, output_buffer, input, 0, sizeof(softpwm_meta), (uint8_t *)softpwm_meta));
+			return(build_reply(output_buffer_length, output_buffer, input, 0, sizeof(duty), &duty));
 		}
 
 		case(0x50):	// read output / softpwm
@@ -570,9 +571,9 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 			if(mode > 3)
 				return(build_reply(output_buffer_length, output_buffer, input, 3, 0, 0));
 
-			softpwm_meta[io].pwm_mode = input_buffer[1];
+			softpwm_meta[io].pwm_mode = mode;
 
-			return(build_reply(output_buffer_length, output_buffer, input, 0, sizeof(softpwm_meta), (uint8_t *)softpwm_meta));
+			return(build_reply(output_buffer_length, output_buffer, input, 0, sizeof(mode), &mode));
 		}
 
 		case(0x70):	// read softpwm mode
@@ -632,9 +633,9 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 			if(mode > 3)
 				return(build_reply(output_buffer_length, output_buffer, input, 3, 0, 0));
 
-			pwm_meta[io].pwm_mode = input_buffer[1];
+			pwm_meta[io].pwm_mode = mode;
 
-			return(build_reply(output_buffer_length, output_buffer, input, 0, sizeof(pwm_meta), (uint8_t *)pwm_meta));
+			return(build_reply(output_buffer_length, output_buffer, input, 0, sizeof(mode), &mode));
 		}
 
 		case(0xb0):	// read pwm mode
