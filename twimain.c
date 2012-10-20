@@ -49,6 +49,25 @@ static	uint16_t	duty16, diff16;
 
 static	void update_static_softpwm_ports(void);
 
+static void put_word(uint16_t from, uint8_t *to)
+{
+	to[0] = (from & 0xff00) >> 8;
+	to[1] = (from & 0x00ff) >> 0;
+}
+
+static void put_long(uint32_t from, uint8_t *to)
+{
+	to += 4;
+
+	*(--to) = from & 0xff;
+	from >>= 8;
+	*(--to) = from & 0xff;
+	from >>= 8;
+	*(--to) = from & 0xff;
+	from >>= 8;
+	*(--to) = from & 0xff;
+}
+
 ISR(WDT_vect)
 {
 	dirty = 0;
@@ -311,6 +330,64 @@ static void build_reply(uint8_t volatile *output_buffer_length, volatile uint8_t
 	*output_buffer_length = 3 + reply_length + 1;
 }
 
+static void extended_command(uint8_t buffer_size, volatile uint8_t input_buffer_length, const volatile uint8_t *input_buffer,
+						uint8_t volatile *output_buffer_length, volatile uint8_t *output_buffer)
+{
+	uint8_t command = input_buffer[1];
+
+	if(command < 5)
+	{
+		struct
+		{
+			uint8_t	amount;
+			uint8_t	data[4];
+		} control_info;
+
+		switch(input_buffer[1])
+		{
+			case(0x00):	// get digital inputs
+			{
+				control_info.amount = INPUT_PORTS;
+				put_long(0x3fffffff, &control_info.data[0]);
+				break;
+			}
+
+			case(0x01):	// get analog inputs
+			{
+				control_info.amount = ADC_PORTS;
+				put_word(0x0000, &control_info.data[0]);
+				put_word(0x03ff, &control_info.data[2]);
+				break;
+			}
+
+			case(0x02):	// get digital outputs
+			{
+				control_info.amount = OUTPUT_PORTS;
+				put_word(0x0000, &control_info.data[0]);
+				put_word(0x00ff, &control_info.data[2]);
+				break;
+			}
+
+			case(0x03):	// get pwm outputs
+			{
+				control_info.amount = PWM_PORTS;
+				put_word(0x0000, &control_info.data[0]);
+				put_word(0x03ff, &control_info.data[2]);
+				break;
+			}
+
+			default:
+			{
+				return(build_reply(output_buffer_length, output_buffer, input_buffer[0], 7, 0, 0));
+			}
+		}
+
+		return(build_reply(output_buffer_length, output_buffer, input_buffer[0], 0, sizeof(control_info), (uint8_t *)&control_info));
+	}
+
+	return(build_reply(output_buffer_length, output_buffer, input_buffer[0], 7, 0, 0));
+}
+
 static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_length, const volatile uint8_t *input_buffer,
 						uint8_t volatile *output_buffer_length, volatile uint8_t *output_buffer)
 {
@@ -336,14 +413,19 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 			{
 				case(0x00):	// identify
 				{
-					static const uint8_t replystring[] =
+					struct
+					{
+						uint8_t id1, id2;
+						uint8_t model, version, revision;
+						uint8_t name[16];
+					} reply =
 					{
 						0x4a, 0xfb,
-						0x06, 0x01, 0x00,
-						't', '8', '6', '1', 'a'
+						0x06, 0x01, 0x01,
+						"attiny861a",
 					};
 
-					return(build_reply(output_buffer_length, output_buffer, input, 0, sizeof(replystring), replystring));
+					return(build_reply(output_buffer_length, output_buffer, input, 0, sizeof(reply), (uint8_t *)&reply));
 				}
 
 				case(0x01):	// 0x02 read ADC
@@ -359,8 +441,7 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 
 					uint8_t replystring[2];
 
-					replystring[0] = (value & 0xff00) >> 8;
-					replystring[1] = (value & 0x00ff) >> 0;
+					put_word(value, replystring);
 
 					return(build_reply(output_buffer_length, output_buffer, input, 0, sizeof(replystring), replystring));
 				}
@@ -374,23 +455,21 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 				case(0x03): // 0x03 DEBUG read timer1 counter
 				{
 					uint16_t value = pwm_timer1_get_counter();
-					uint8_t rv[2];
+					uint8_t replystring[2];
 
-					rv[0] = (value & 0xff00) >> 8;
-					rv[1] = (value & 0x00ff) >> 0;
+					put_word(value, replystring);
 
-					return(build_reply(output_buffer_length, output_buffer, input, 0, sizeof(rv), rv));
+					return(build_reply(output_buffer_length, output_buffer, input, 0, sizeof(replystring), replystring));
 				}
 
 				case(0x04): // 0x04 DEBUG read timer1 max
 				{
 					uint16_t value = pwm_timer1_get_max();
-					uint8_t rv[2];
+					uint8_t replystring[2];
 
-					rv[0] = (value & 0xff00) >> 8;
-					rv[1] = (value & 0x00ff) >> 0;
+					put_word(value, replystring);
 
-					return(build_reply(output_buffer_length, output_buffer, input, 0, sizeof(rv), rv));
+					return(build_reply(output_buffer_length, output_buffer, input, 0, sizeof(replystring), replystring));
 				}
 
 				case(0x05): // 0x05 read timer1 prescaler
@@ -412,7 +491,7 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 
 				case(0x07): // extended command
 				{
-					return(build_reply(output_buffer_length, output_buffer, input, 7, 0, 0));
+					return(extended_command(buffer_size, input_buffer_length, input_buffer, output_buffer_length, output_buffer));
 				}
 
 				default:
@@ -430,17 +509,13 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 			if(io >= INPUT_PORTS)
 				return(build_reply(output_buffer_length, output_buffer, input, 3, 0, 0));
 
-			uint32_t counter = counters_meta[io].counter;
+			uint8_t		replystring[4];
+			uint32_t	counter = counters_meta[io].counter;
 
 			if(command == 0x20)
 				counters_meta[io].counter = 0;
 
-			uint8_t replystring[4];
-
-			replystring[0] = (counter & 0xff000000) >> 24;
-			replystring[1] = (counter & 0x00ff0000) >> 16;
-			replystring[2] = (counter & 0x0000ff00) >> 8;
-			replystring[3] = (counter & 0x000000ff) >> 0;
+			put_long(counter, replystring);
 
 			return(build_reply(output_buffer_length, output_buffer, input, 0, sizeof(replystring), replystring));
 		}
@@ -539,8 +614,7 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 			uint16_t value = pwm_timer1_get_pwm(io);
 			uint8_t reply[2];
 
-			reply[0] = (value & 0xff00) >> 8;
-			reply[1] = (value & 0x00ff) >> 0;
+			put_word(value, reply);
 
 			return(build_reply(output_buffer_length, output_buffer, input, 0, sizeof(reply), reply));
 		}
@@ -640,8 +714,7 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 				}
 			}
 
-			replystring[0] = (stats & 0xff00) >> 8;
-			replystring[1] = (stats & 0x00ff) >> 0;
+			put_word(stats, replystring);
 
 			return(build_reply(output_buffer_length, output_buffer, input, 0, sizeof(replystring), replystring));
 		}
