@@ -287,9 +287,12 @@ ISR(PCINT_vect)
 
 	for(slot = 0; slot < INPUT_PORTS; slot++)
 	{
-		if(!(*(input_ports[slot].pin) & _BV(input_ports[slot].bit)))
+		ioport			= &input_ports[slot];
+		counter_slot	= &counter_meta[slot];
+
+		if((watchdog_counter > 4) && ((*ioport->pin & _BV(ioport->bit)) ^ counter_slot->state))
 		{
-			counters_meta[slot].counter++;
+			counter_slot->counter++;
 			dirty = 1;
 		}
 
@@ -520,10 +523,10 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 				return(build_reply(output_buffer_length, output_buffer, input, 3, 0, 0));
 
 			uint8_t		replystring[4];
-			uint32_t	counter = counters_meta[io].counter;
+			uint32_t	counter = counter_meta[io].counter;
 
 			if(command == 0x20)
-				counters_meta[io].counter = 0;
+				counter_meta[io].counter = 0;
 
 			put_long(counter, replystring);
 
@@ -537,7 +540,8 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 			if(io >= INPUT_PORTS)
 				return(build_reply(output_buffer_length, output_buffer, input, 3, 0, 0));
 
-			value = !!(*input_ports[io].pin & (1 << input_ports[io].bit));
+			ioport	= &input_ports[io];
+			value	= *ioport->pin & _BV(ioport->bit) ? 0xff : 0x00;
 
 			return(build_reply(output_buffer_length, output_buffer, input, 0, 1, &value));
 		}
@@ -757,8 +761,6 @@ int main(void)
 
 	for(slot = 0; slot < INPUT_PORTS; slot++)
 	{
-		ioport = &input_ports[slot];
-
 		*ioport->port		&= ~_BV(ioport->bit);
 		*ioport->ddr		&= ~_BV(ioport->bit);
 		*ioport->port		|=  _BV(ioport->bit);
