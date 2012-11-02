@@ -302,7 +302,7 @@ ISR(PCINT_vect)
 	if(dirty)
 	{
 		*internal_output_ports[1].port |= _BV(internal_output_ports[1].bit);
-		input_sense_led = 48;
+		input_sense_led = 8;
 	}
 }
 
@@ -409,7 +409,7 @@ static void twi_callback(uint8_t buffer_size, volatile uint8_t input_buffer_leng
 	uint8_t	io;
 
 	*internal_output_ports[0].port |= _BV(internal_output_ports[0].bit);
-	i2c_sense_led = 4;
+	i2c_sense_led = 2;
 
 	if(input_buffer_length < 1)
 		return(build_reply(output_buffer_length, output_buffer, 0, 1, 0, 0));
