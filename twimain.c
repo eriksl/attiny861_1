@@ -51,8 +51,11 @@ static	void update_static_softpwm_ports(void);
 
 static void put_word(uint16_t from, uint8_t *to)
 {
-	to[0] = (from & 0xff00) >> 8;
-	to[1] = (from & 0x00ff) >> 0;
+	to += 2;
+
+	*(--to) = from & 0xff;
+	from >>= 8;
+	*(--to) = from & 0xff;
 }
 
 static void put_long(uint32_t from, uint8_t *to)

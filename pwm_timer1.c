@@ -162,12 +162,16 @@ uint16_t pwm_timer1_get_pwm(uint8_t port)
 	uint16_t rv;
 
 	if(port >= PWM_PORTS)
-		return(0);
+		return(0xffff);
 
 	const pwmport_t *slot = &pwm_ports[port];
 
 	rv = *slot->compare_reg_low;
 	rv |= *slot->compare_reg_high << 8;
+
+
+	if((rv == 0) && (*slot->port & _BV(slot->bit)))
+		rv = 0x3ff;
 
 	return(rv);
 }
