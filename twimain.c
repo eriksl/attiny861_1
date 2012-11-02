@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <util/delay.h>
 
 #include <usitwislave.h>
 
@@ -791,38 +790,26 @@ int main(void)
 		for(slot = 0; slot < INTERNAL_OUTPUT_PORTS; slot++)
 		{
 			ioport = &internal_output_ports[slot];
-
 			*ioport->port |= _BV(ioport->bit);
-			_delay_ms(100);
 		}
 
 		for(slot = 0; slot < INTERNAL_OUTPUT_PORTS; slot++)
 		{
 			ioport = &internal_output_ports[slot];
-
 			*ioport->port &= ~_BV(ioport->bit);
-			_delay_ms(100);
 		}
-
-		_delay_ms(150);
 
 		for(slot = INTERNAL_OUTPUT_PORTS; slot > 0; slot--)
 		{
 			ioport = &internal_output_ports[slot - 1];
-
 			*ioport->port |= _BV(ioport->bit);
-			_delay_ms(100);
 		}
 
 		for(slot = INTERNAL_OUTPUT_PORTS; slot > 0; slot--)
 		{
 			ioport = &internal_output_ports[slot - 1];
-
 			*ioport->port &= ~_BV(ioport->bit);
-			_delay_ms(100);
 		}
-
-		_delay_ms(150);
 	}
 
 	adc_init();
