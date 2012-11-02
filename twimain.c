@@ -33,13 +33,15 @@ typedef struct
 typedef struct
 {
 	uint32_t	counter;
+	uint8_t		state;
 } counter_meta_t;
 
 static	const	ioport_t		*ioport;
 static			pwm_meta_t		softpwm_meta[OUTPUT_PORTS];
 static			pwm_meta_t		pwm_meta[PWM_PORTS];
 static			pwm_meta_t		*pwm_slot;
-static			counter_meta_t	counters_meta[INPUT_PORTS];
+static			counter_meta_t	counter_meta[INPUT_PORTS];
+static			counter_meta_t	*counter_slot;
 
 static	uint8_t		slot, dirty, duty, next_duty, diff;
 static	uint8_t		timer0_value, timer0_debug_1, timer0_debug_2;
@@ -286,6 +288,8 @@ ISR(PCINT_vect)
 			counters_meta[slot].counter++;
 			dirty = 1;
 		}
+
+		counter_slot->state = *ioport->pin & _BV(ioport->bit);
 	}
 
 	if(dirty)
@@ -753,11 +757,14 @@ int main(void)
 
 		*ioport->port		&= ~_BV(ioport->bit);
 		*ioport->ddr		&= ~_BV(ioport->bit);
-		*ioport->port		|= _BV(ioport->bit);
-		*ioport->pcmskreg	|= _BV(ioport->pcmskbit);
-		GIMSK				|= _BV(ioport->gimskbit);
+		*ioport->port		|=  _BV(ioport->bit);
+		*ioport->pcmskreg	|=  _BV(ioport->pcmskbit);
+		GIMSK				|=  _BV(ioport->gimskbit);
 
-		counters_meta[slot].counter = 0;
+		ioport					= &input_ports[slot];
+		counter_slot			= &counter_meta[slot];
+		counter_slot->state		= *ioport->pin & _BV(ioport->bit);
+		counter_slot->counter	= 0;
 	}
 
 	for(slot = 0; slot < OUTPUT_PORTS; slot++)
