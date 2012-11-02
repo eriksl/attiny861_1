@@ -43,6 +43,7 @@ static			pwm_meta_t		*pwm_slot;
 static			counter_meta_t	counter_meta[INPUT_PORTS];
 static			counter_meta_t	*counter_slot;
 
+static	uint8_t		watchdog_counter;
 static	uint8_t		slot, dirty, duty, next_duty, diff;
 static	uint8_t		timer0_value, timer0_debug_1, timer0_debug_2;
 static	uint8_t		i2c_sense_led, input_sense_led;
@@ -75,6 +76,9 @@ static void put_long(uint32_t from, uint8_t *to)
 ISR(WDT_vect)
 {
 	dirty = 0;
+
+	if(watchdog_counter < 255)
+		watchdog_counter++;
 
 	pwm_slot = &softpwm_meta[0];
 
