@@ -648,14 +648,17 @@ static void process_command(volatile uint8_t twi_input_buffer_length, const vola
 void twi_idle(void)
 {
 	if(adc_warmup > 0)
-		adc_warmup--;
-	else
 	{
-		//if(adc_samples < 256)
-		//{
-			adc_samples++;
-			adc_value += adc_read();
-		//}
+		adc_warmup--;
+		adc_start();
+		return;
+	}
+
+	if(adc_ready() && (adc_samples < 16384))
+	{
+		adc_samples++;
+		adc_value += adc_read();
+		adc_start();
 	}
 }
 

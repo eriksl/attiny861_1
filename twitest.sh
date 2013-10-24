@@ -63,7 +63,7 @@ c=$(printf "%d\n" "0x${a[5]}${a[6]}${a[7]}${a[8]}")
 if [ $c != 0 ]
 then
 	d=$[c / b]
-	if [ $d != 1023 ]
+if [ $d != 1023 ]
 	then
 		echo $a - $b - $c - $d
 	fi

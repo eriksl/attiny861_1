@@ -77,13 +77,3 @@ void adc_select(const adcport_t *p)
 
 	ADCW = 0;
 }
-
-uint16_t adc_read(void)
-{
-	ADCSRA |= _BV(ADSC);
-
-	while(ADCSRA & _BV(ADSC))	// conversion not ready
-			(void)0;
-
-	return(ADCW);
-}

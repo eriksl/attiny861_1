@@ -7,6 +7,20 @@
 
 void adc_init(void);
 void adc_select(const adcport_t *source);
-uint16_t adc_read(void);
+
+static inline void adc_start(void)
+{
+	ADCSRA |= _BV(ADSC);
+}
+
+static inline uint8_t adc_ready(void)
+{
+	return(!(ADCSRA & _BV(ADSC)));
+}
+
+static inline uint16_t adc_read(void)
+{
+	return(ADCW);
+}
 
 #endif
