@@ -287,6 +287,7 @@ static void reply(uint8_t error_code, uint8_t reply_length, const uint8_t *reply
 	if((reply_length + 4) > USI_TWI_BUFFER_SIZE)
 		return;
 
+	output_buffer[0] = 3 + reply_length;
 	output_buffer[1] = error_code;
 	output_buffer[2] = input_byte;
 
@@ -298,8 +299,6 @@ static void reply(uint8_t error_code, uint8_t reply_length, const uint8_t *reply
 
 	output_buffer[3 + reply_length] = checksum;
 	*output_buffer_length = 3 + reply_length + 1;
-
-	output_buffer[0] = 3 + reply_length;	// set length from 0 finally (atomic)
 }
 
 static void reply_char(uint8_t value)
@@ -385,8 +384,6 @@ static void extended_command()
 static void process_command(volatile uint8_t twi_input_buffer_length, const volatile uint8_t *twi_input_buffer,
 						uint8_t volatile *twi_output_buffer_length, volatile uint8_t *twi_output_buffer)
 {
-	twi_output_buffer[0] = 0;	// ensure nothing gets sent when the output is still being prepared
-
 	*internal_output_ports[1].port |= _BV(internal_output_ports[1].bit);
 	i2c_sense_led = 2;
 
