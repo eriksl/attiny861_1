@@ -1,16 +1,18 @@
 MCU			=		attiny861
+USE_CRYSTAL	=		0
+MCUSPEED	=		8000000
 PROGRAMMER	=		dragon_isp
 PRGFLAGS	=		-b 0 -P usb
 
-PROGRAM		=		twimain
+PROGRAM		=		main
 OBJFILES	=		adc.o ioports.o timer0.o pwm_timer1.o watchdog.o usitwislave/usitwislave.o $(PROGRAM).o
 HEADERS		=		adc.h ioports.h timer0.h pwm_timer1.h watchdog.h usitwislave/usitwislave_devices.h usitwislave/usitwislave.h
 HEXFILE		=		$(PROGRAM).hex
 ELFFILE		=		$(PROGRAM).elf
 PROGRAMMED	=		.programmed
-CFLAGS		=		-Wall -Winline -O3 -mmcu=$(MCU) -DF_CPU=8000000UL -Iusitwislave -DUSI_ON_PORT_A \
-					-fpack-struct -funroll-loops -funit-at-a-time -fno-keep-static-consts \
-					-frename-registers
+CFLAGS		=		--std=c99 -I$(CURDIR) \
+					-Wall -Winline -Os -mmcu=$(MCU) -DF_CPU=$(MCUSPEED) -DUSE_CRYSTAL=$(USE_CRYSTAL) -Iusitwislave -DUSI_ON_PORT_A \
+					-fpack-struct -funroll-loops -funit-at-a-time -fno-keep-static-consts -frename-registers
 LDFLAGS		=		-Wall -mmcu=$(MCU)
 
 .PHONY:				all clean hex
@@ -26,6 +28,10 @@ $(PROGRAM).o:		$(PROGRAM).c $(HEADERS)
 %.o:				%.c
 					@echo "CC $< -> $@"
 					@avr-gcc -c $(CFLAGS) $< -o $@
+
+%.o:				%.S
+					@echo "AS $< -> $@"
+					@avr-gcc -x assembler-with-cpp -c $(CFLAGS) $< -o $@
 
 %.s:				%.c
 					@echo "CC (ASM) $< -> $@"
@@ -48,7 +54,7 @@ $(HEXFILE):			$(ELFFILE)
 
 $(PROGRAMMED):		$(HEXFILE)
 					@echo "AVRDUDE $^"
-					@sh -c "avrdude -vv -c $(PROGRAMMER) -p $(MCU) $(PRGFLAGS) -U flash:w:$^ > $(PROGRAMMED) 2>&1"
+					@avrdude -vv -c $(PROGRAMMER) -p $(MCU) $(PRGFLAGS) -U flash:w:$^
 
 clean:			
 					@echo "RM $(OBJFILES) $(ELFFILE) $(HEXFILE) $(PROGRAMMED)"

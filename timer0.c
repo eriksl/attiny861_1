@@ -25,7 +25,7 @@ void timer0_init(uint8_t prescaler)
 				(0 << ACIC0)	|	// enable capture mode by analog compare
 				(0 << 2)		|	// reserved
 				(0 << 1)		|	// reserved
-				(1 << WGM00);		// waveform generation mode => ctc
+				(0 << WGM00);		// waveform generation mode => normal mode
 
 	mask =		(0 << OCIE1D)	|	// enable output compare match 1 d interrupt
 				(0 << OCIE1A)	|	// enable output compare match 1 a interrupt
@@ -44,7 +44,7 @@ void timer0_init(uint8_t prescaler)
 				(1 << OCIE0A)	|	// enable output compare match 0 a interrupt
 				(1 << OCIE0B)	|	// enable output compare match 0 b interrupt
 				(0 << TOIE1)	|	// enable timer 1 overflow interrupt
-				(0 << TOIE0)	|	// enable timer 0 overflow interrupt
+				(1 << TOIE0)	|	// enable timer 0 overflow interrupt
 				(0 << TICIE0);		// enable timer 0 capture interrupt
 
 	TIMSK = temp;
@@ -70,7 +70,7 @@ void timer0_start(void)
 				(0 << TSM)			|	// timer synchronisation mode
 				(0 << PSR0)			|	// prescaler reset
 				(cs0[2] << CS02)	|	// prescaler
-				(cs0[1] << CS01)	|	// 	start timer
+				(cs0[1] << CS01)	|	// start timer
 				(cs0[0] << CS00);		//
 }
 

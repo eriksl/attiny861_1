@@ -5,7 +5,6 @@
 
 typedef struct
 {
-	uint8_t	refs[3];
 	uint8_t	mux[6];
 } adcport_t;
 
@@ -36,14 +35,17 @@ typedef struct
 
 enum
 {
-	ADC_PORTS				= 4,
+	TEMP_PORTS				= 2,
+	ANALOG_PORTS			= 2,
 	INPUT_PORTS				= 4,
 	OUTPUT_PORTS			= 1,
+	USB_PORTS				= 0,
 	INTERNAL_OUTPUT_PORTS	= 2,
 	PWM_PORTS				= 3
 };
 
-extern const adcport_t	adc_ports[];
+extern const adcport_t	temp_ports[];
+extern const adcport_t	analog_ports[];
 extern const ioport_t	input_ports[];
 extern const ioport_t	output_ports[];
 extern const ioport_t	internal_output_ports[];

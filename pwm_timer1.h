@@ -4,8 +4,6 @@
 #include <stdint.h>
 #include <avr/io.h>
 
-#define always_inline __attribute__((always_inline)) __attribute__((used))
-
 enum
 {
 	PWM_TIMER1_PRESCALER_OFF	= 0,
@@ -37,7 +35,7 @@ static	void		pwm_timer1_reset_counter(void);
 		void		pwm_timer1_stop(void);
 		uint8_t		pwm_timer1_status(void);
 
-static always_inline void pwm_timer1_reset_counter(void)
+static inline void pwm_timer1_reset_counter(void)
 {
 	TC1H	= 0;
 	TCNT1	= 0;

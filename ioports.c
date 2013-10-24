@@ -3,24 +3,24 @@
 
 #include "ioports.h"
 
-const adcport_t adc_ports[ADC_PORTS] = 
+const adcport_t temp_ports[TEMP_PORTS] = 
 {
-	{							// pa7 pin 11
-		{ 0, 0, 0 },			// Vref = Vcc
-		{ 0, 1, 1, 0, 0, 0 },	// mux = adc6
+	{							// internal temp sensor
+		{ 1, 1, 1, 1, 1, 1 }	// mux = adc11 = 111111
 	},
-	{							// pa5 pin 13
-		{ 0, 0, 0 },			// Vref = Vcc
-		{ 0, 0, 1, 0, 0, 0 },	// mux = adc4
-	},
-	{							// pa4 pin 14
-		{ 0, 0, 0 },			// Vref = Vcc
+	{							// pa4 pin 14 adc input 3
 		{ 1, 1, 0, 0, 0, 0 },	// mux = adc3
 	},
-	{							// internal temp sensor
-		{ 0, 1, 0, },			// Vref = internal 1.1V reference
-		{ 1, 1, 1, 1, 1, 1 }	// mux = adc11
-	}
+};
+
+const adcport_t analog_ports[ANALOG_PORTS] = 
+{
+	{							// pa7 pin 11 adc input 1
+		{ 0, 1, 1, 0, 0, 0 },	// mux = adc6 = 000110
+	},
+	{							// pa5 pin 13 adc input 2
+		{ 0, 0, 1, 0, 0, 0 },	// mux = adc4
+	},
 };
 
 const ioport_t input_ports[INPUT_PORTS] =
@@ -33,13 +33,13 @@ const ioport_t input_ports[INPUT_PORTS] =
 
 const ioport_t output_ports[OUTPUT_PORTS] =
 {
-	{ &PORTB, &PINB, &DDRB, 2 }		// b2
+	{ &PORTB, &PINB, &DDRB, 2 }		// b2	output 1
 };
 
 const ioport_t internal_output_ports[INTERNAL_OUTPUT_PORTS] =
 {
-	{ &PORTB, &PINB, &DDRB, 4 },	// b4
-	{ &PORTA, &PINA, &DDRA, 3 },	// a3
+	{ &PORTA, &PINA, &DDRA, 3 },	// a3	input sense
+	{ &PORTB, &PINB, &DDRB, 4 },	// b4	command sense
 };
 
 const pwmport_t pwm_ports[PWM_PORTS] =

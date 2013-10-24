@@ -1,4 +1,4 @@
-MODEL 6 (ATTINY861A), VERSION 1, REVISION 0
+MODEL 6 (ATTINY861A), VERSION 1, REVISION 2
 
 *** COMMANDS ***
 
@@ -21,36 +21,29 @@ MODEL 6 (ATTINY861A), VERSION 1, REVISION 0
 																	BB[5] = firmware version
 																	CC[6] = firmware revision
 																	DD[7] = ascii id string
-			0	0	0	0	0		0	0	1		0x01	read adc, returns 2 bytes
-			0	0	0	0	0		0	1	0		0x02	timer0 counter, returns 1 byte
-			0	0	0	0	0		0	1	1		0x03	timer1 counter, returns 2 bytes
+			0	0	0	0	0		0	0	1		0x01	read analog input, returns 2 bytes sample count + 4 bytes total value
+			0	0	0	0	0		0	1	0		0x02	read temperature sensor, returns 2 bytes temperature * 10
 			0	0	0	0	0		1	1	1		0x07	extended command, rest follows after this byte
 
 			0	0	0	1	0						0x10	read counter, returns 4 bytes
 			0	0	1	0	0						0x20	read/reset counter, returns like read counter
 
-			0	0	1	1	0						0x30	read input, returns 1 byte
+			0	0	1	1	0						0x30	read input, returns 1 byte, either 0x00 or 0x01
 
-			0	1	0	0	0						0x40	write output / softpwm, 1 byte, 0 = off, 255 = on, other is pwm
-			0	1	0	1	0						0x50	read output / softpwm, 1 byte like write output / softpwm
-			0	1	1	0	0						0x60	write softpwm mode, supply 1 byte
+			0	1	0	0	0						0x40	write output / softpwm, 1 byte, 0 = off, 255 = on, other is pwm, returns 1 byte
+			0	1	0	1	0						0x50	read output / softpwm, 1 byte like write output / softpwmm returns 1 byte
+			0	1	1	0	0						0x60	write softpwm mode, supply 1 byte, returns 1 byte
 			0	1	1	1	0						0x70	read softpwm mode, returns 1 byte
 
-			1	0	0	0	0						0x80	write pwm, 2 bytes, 0 = off, > 1023 = on
-			1	0	0	1	0						0x90	read pwm, 2 bytes like write pwm
-			1	0	1	0	0						0xa0	write hardpwm mode, supply 1 byte
+			1	0	0	0	0						0x80	write pwm, 2 bytes, 0 = off, > 1023 = on, returns 2 bytes
+			1	0	0	1	0						0x90	read pwm, 2 bytes like write pwm, returns 2 bytes
+			1	0	1	0	0						0xa0	write hardpwm mode, supply 1 byte, returns 1 byte
 			1	0	1	1	0						0xb0	read hardpwm mode, returns 1 byte
 
-			1	1	0	0	0						0xc0	start adc conversion, analog input #
+			1	1	0	0	0						0xc0	select analog input, returns 1 byte selected input
 
-			1	1	1	1	0		0	0	0		0xf0	twi stats - disable
-			1	1	1	1	0		0	0	1		0xf1	twi stats - enable
-			1	1	1	1	0		0	1	0		0xf2	twi stats - read start conditions		returns AA BB as msb lsb.
-			1	1	1	1	0		0	1	1		0xf3	twi stats - read stop conditions		returns AA BB as msb lsb.
-			1	1	1	1	0		1	0	0		0xf4	twi stats - read error conditions		returns AA BB as msb lsb.
-			1	1	1	1	0		1	0	1		0xf5	twi stats - read overflow conditions	returns AA BB as msb lsb.
-			1	1	1	1	0		1	1	0		0xf6	twi stats - read local frames			returns AA BB as msb lsb.
-			1	1	1	1	0		1	1	1		0xf7	twi stats - read idle calls				returns AA BB as msb lsb.
+			1	1	0	1	0						0xd0	select temperature sensor, returns 1 byte selected input
+			1	1	1	0	0						0xe0	calibrate temperature sensor, expects 2 bytes multiplier (* 1000) + 2 bytes offset (* 1000)
 
 	softpwm mode =
 			0	on
@@ -60,10 +53,11 @@ MODEL 6 (ATTINY861A), VERSION 1, REVISION 0
 
 	EXTENDED COMMANDS
 
-			0x00	get digital inputs		returns 1 byte amount, 4 bytes maximum counter value (0 = no counter)
-			0x01	get analog inputs		returns 1 byte amount, 2 bytes mininum value, 2 bytes maximum value
-			0x02	get digital outputs		returns 1 byte amount, 2 bytes maximum pwm value (0 = no pwm)
-			0x03	get pwm outputs			returns 1 byte amount, 2 bytes maximum pwm value
+			0x00	get digital inputs							returns 1 byte amount, 4 bytes maximum counter value (0 = no counter)
+			0x01	get analog inputs							returns 1 byte amount, 2 bytes minimum value, 2 bytes maximum value
+			0x02	get digital outputs							returns 1 byte amount, 2 bytes minimum pwm value, 2 bytes maximum pwm value (0 = no pwm)
+			0x03	get pwm outputs								returns 1 byte amount, 2 bytes minimum pwm value, 2 bytes maximum pwm value
+			0x04	get temperature sensors						returns 1 byte amount
 
 *** REPLY ***
 
@@ -85,25 +79,25 @@ MODEL 6 (ATTINY861A), VERSION 1, REVISION 0
 
 *** FEATURES ***
 
-	pin		name		isp			function			connection
+	pin		name		isp			function					connection
 
-	1		pb0			mosi 		pcint8 = input 2	input 3
-	2		pb1			miso 		oc1a = pwm 0		output 1
-	3		pb2			sck 		pb2 = output 0		output 4
-	4		pb3						oc1b = pwm 1		output 2
+	1		pb0			mosi 		pcint8		input 2			input 3
+	2		pb1			miso 		oc1a		pwm 0			output 1
+	3		pb2			sck 		pb2			output 0		output 4
+	4		pb3						oc1b		pwm 1			output 2
 	5		Vcc			Vcc
 	6		GND			GND
-	7		pb4						pb4 = output 1		i2c command led
-	8		pb5						oc1d = pwm 2		output 3
-	9		pb6						pcint14 = input 0	input 1
+	7		pb4						XTAL1 pb4	output 2		command sense
+	8		pb5						XTAL2 oc1d	pwm 2			output 3
+	9		pb6						pcint14		input 0			input 1
 	10		pb7			reset
-	11		pa7						adc6 / ain1			adc input 1
-	12		pa6						pcint6 = input 1	input 2
-	13		pa5						adc4 / ain2			adc input 2
-	14		pa4						adc3 / icp0			adc input 3
+	11		pa7						adc6 / ain1	adc				input 1
+	12		pa6						pcint6		input 1			input 2
+	13		pa5						adc4 / ain2	adc				input 2
+	14		pa4						adc3 / icp0	adc				input 3
 	15		AVcc
 	16		AGND
-	17		pa3						pa3 = output 2		input sense led
+	17		pa3						pa3			output 1		input sense
 	18		pa2						scl
-	19		pa1						pcint1 = input 3	input 4
+	19		pa1						pcint1		input 3			input 4
 	20		pa0						sda

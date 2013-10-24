@@ -1,11 +1,12 @@
 #if !defined(_ADC_H_)
 #define _ADC_H_
+#include "ioports.h"
 
 #include <stdint.h>
 #include <avr/io.h>
 
 void adc_init(void);
-void adc_start(uint8_t source);	// source: 0 = adc6 = pa7, 1 = internal temperature sensor
-void adc_stop(void);
+void adc_select(const adcport_t *source);
+uint16_t adc_read(void);
 
 #endif
