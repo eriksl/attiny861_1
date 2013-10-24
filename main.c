@@ -56,8 +56,6 @@ static	uint8_t	input_byte;
 static	uint8_t	input_command;
 static	uint8_t	input_io;
 
-static	uint8_t	buffer_size;
-
 static	uint8_t		adc_warmup;
 static	uint16_t	adc_samples;
 static	uint32_t	adc_value;
@@ -286,7 +284,7 @@ static void reply(uint8_t error_code, uint8_t reply_length, const uint8_t *reply
 	uint8_t checksum;
 	uint8_t ix;
 
-	if((reply_length + 4) > buffer_size)
+	if((reply_length + 4) > USI_TWI_BUFFER_SIZE)
 		return;
 
 	output_buffer[0] = 3 + reply_length;
@@ -383,13 +381,11 @@ static void extended_command()
 	return(reply_error(7));
 }
 
-static void process_command(uint8_t twi_buffer_size, volatile uint8_t twi_input_buffer_length, const volatile uint8_t *twi_input_buffer,
+static void process_command(volatile uint8_t twi_input_buffer_length, const volatile uint8_t *twi_input_buffer,
 						uint8_t volatile *twi_output_buffer_length, volatile uint8_t *twi_output_buffer)
 {
 	*internal_output_ports[1].port |= _BV(internal_output_ports[1].bit);
 	i2c_sense_led = 2;
-
-	buffer_size				= twi_buffer_size;
 
 	input_buffer_length		= twi_input_buffer_length;
 	input_buffer			= twi_input_buffer;
