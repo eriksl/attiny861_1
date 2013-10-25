@@ -65,10 +65,14 @@ then
 	d=$[c / b]
 if [ $d != 1023 ]
 	then
+		echo
 		echo $a - $b - $c - $d
+		echo
 	fi
 else
+	echo
 	echo $a - $b - $c
+	echo
 fi
 
 #	usleep 100000
