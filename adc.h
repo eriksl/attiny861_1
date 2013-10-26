@@ -10,6 +10,7 @@ void adc_select(const adcport_t *source);
 
 static inline void adc_start(void)
 {
+	ADCW = 0;
 	ADCSRA |= _BV(ADSC);
 }
 

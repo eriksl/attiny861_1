@@ -2,9 +2,8 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
-#include <avr/sleep.h>
 #include <util/delay.h>
-#include <util/atomic.h>
+#include <avr/eeprom.h>
 
 #include <usitwislave.h>
 
@@ -55,6 +54,9 @@ static	uint8_t	i2c_sense_led, input_sense_led;
 static	uint8_t	input_byte;
 static	uint8_t	input_command;
 static	uint8_t	input_io;
+
+static	int32_t	temp_cal_multiplier;
+static	int32_t	temp_cal_offset;
 
 static	uint8_t		adc_warmup;
 static	uint16_t	adc_samples;
@@ -416,7 +418,7 @@ static void process_command(volatile uint8_t twi_input_buffer_length, const vola
 					} id =
 					{
 						0x4a, 0xfb,
-						0x06, 0x01, 0x02,
+						0x06, 0x01, 0x03,
 						"attiny861a",
 					};
 
@@ -438,10 +440,23 @@ static void process_command(volatile uint8_t twi_input_buffer_length, const vola
 
 				case(0x02):	// read temperature sensor
 				{
-					uint8_t reply_string[6];
+					int32_t	value;
+					int32_t	samples;
 
-					put_word(adc_samples, &reply_string[0]);
-					put_long(adc_value, &reply_string[2]);
+					uint8_t reply_string[8];
+
+					value	= (int32_t)adc_value;
+					samples	= (int32_t)adc_samples;
+
+					value	*= temp_cal_multiplier;
+					value	/= samples;
+					value	+= temp_cal_offset;
+					value	/= 100;
+
+					put_word(value, &reply_string[0]);
+					put_word(adc_samples, &reply_string[2]);
+					put_long(adc_value, &reply_string[4]);
+
 					adc_warmup	= adc_warmup_init;
 					adc_samples = 0;
 					adc_value	= 0;
@@ -622,15 +637,53 @@ static void process_command(volatile uint8_t twi_input_buffer_length, const vola
 			adc_samples = 0;
 			adc_value	= 0;
 
+			temp_cal_multiplier = (int32_t)eeprom_read_word((uint16_t*)((input_io * 4) + 0));
+			temp_cal_offset		= (int32_t)eeprom_read_word((uint16_t*)((input_io * 4) + 2)) * 1000;
+
 			return(reply_char(input_io));
 		}
 
-		case(0xe0):	// calibrate temperature sensor // FIXME
+		case(0xe0):	// set temperature sensor calibration values
 		{
+			int16_t value;
+			uint8_t replystring[4];
+
 			if(input_io >= TEMP_PORTS)
 				return(reply_error(3));
 
+			if(input_buffer_length < 5)
+				return(reply_error(4));
+
+			value = (input_buffer[1] << 8) | input_buffer[2];
+			eeprom_update_word((uint16_t*)(input_io * 4) + 0, value);
+
+			value = (input_buffer[3] << 8) | input_buffer[4];
+			eeprom_update_word((uint16_t*)((input_io * 4) + 2), value);
+
+			value = eeprom_read_word((uint16_t*)((input_io * 4) + 0));
+			put_word(value, &replystring[0]);
+
+			value = eeprom_read_word((uint16_t*)((input_io * 4) + 2));
+			put_word(value, &replystring[2]);
+
 			return(reply_char(input_io));
+		}
+
+		case(0xf0):	// read temperature sensor calibration values
+		{
+			int16_t value;
+			uint8_t replystring[4];
+
+			if(input_io >= TEMP_PORTS)
+				return(reply_error(3));
+
+			value = eeprom_read_word((uint16_t*)((input_io * 4) + 0));
+			put_word(value, &replystring[0]);
+
+			value = eeprom_read_word((uint16_t*)((input_io * 4) + 2));
+			put_word(value, &replystring[2]);
+
+			return(reply(0, sizeof(replystring), replystring));
 		}
 
 		default:
@@ -651,7 +704,7 @@ void twi_idle(void)
 		return;
 	}
 
-	if(adc_ready() && (adc_samples < 16384))
+	if(adc_ready() && (adc_samples < 1024))
 	{
 		adc_samples++;
 		adc_value += adc_read();
@@ -760,5 +813,5 @@ int main(void)
 	adc_samples	= 0;
 	adc_value	= 0;
 
-	usi_twi_slave(0x02, 0, process_command, twi_idle);
+	usi_twi_slave(0x02, 1, process_command, twi_idle);
 }

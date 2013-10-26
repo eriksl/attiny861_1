@@ -26,8 +26,14 @@ function send ()
 	flush
 }
 
+#multiplier=1100
+#offset=-301
+
+multiplier=103
+offset=-50
+
 send "s 04 p"
-send "w c0 p r 00 p"
+#send "w c0 p r 00 p"
 
 while true
 do
@@ -56,24 +62,40 @@ do
 #	e=$(printf "%d\n" "0x${a[5]}${a[6]}")
 #	echo $a - $b - $c - $d - $e
 
-a=($(send "w 01 p r 00 p"))
-b=$(printf "%d\n" "0x${a[3]}${a[4]}")
-c=$(printf "%d\n" "0x${a[5]}${a[6]}${a[7]}${a[8]}")
+#a=($(send "w 01 p r 00 p"))
+#b=$(printf "%d\n" "0x${a[3]}${a[4]}")
+#c=$(printf "%d\n" "0x${a[5]}${a[6]}${a[7]}${a[8]}")
 
-if [ $c != 0 ]
-then
-	d=$[c / b]
-if [ $d != 1023 ]
+#if [ $c != 0 ]
+#then
+#d=$[c / b]
+#if [ $d != 1023 ]
+#then
+#echo
+#echo $a - $b - $c - $d
+#echo
+#fi
+#else
+#echo
+#echo $a - $b - $c
+#echo
+#fi
+
+	send "w d1 p" > /dev/null
+	send "r 00 p" > /dev/null
+	usleep 200000
+	send "w 02 p" > /dev/null
+	a=($(send "r 00 p"))
+	b=$(printf "%d\n" "0x${a[3]}${a[4]}")
+	c=$(printf "%d\n" "0x${a[5]}${a[6]}")
+	d=$(printf "%d\n" "0x${a[7]}${a[8]}${a[9]}${a[10]}")
+
+	if [ $c != 0 ]
 	then
-		echo
-		echo $a - $b - $c - $d
-		echo
+		e=$[(d * 10) / c]
+		f=$[(((d * multiplier) / c) + (offset * 1000)) / 100]
+		echo "$a - supplied:$b - samples:$c - total:$d - raw:$e - cooked:$f"
+	else
+		echo "\"$a\""
 	fi
-else
-	echo
-	echo $a - $b - $c
-	echo
-fi
-
-#	usleep 100000
 done
