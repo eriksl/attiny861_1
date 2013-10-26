@@ -39,18 +39,18 @@ typedef struct
 	uint8_t		state;
 } counter_meta_t;
 
-static	pwm_meta_t		softpwm_meta[OUTPUT_PORTS];
-static	pwm_meta_t		pwm_meta[PWM_PORTS];
-static	counter_meta_t	counter_meta[INPUT_PORTS];
-
-static	uint8_t		duty;
-static	uint8_t		watchdog_counter;
-static	uint8_t		i2c_sense_led, input_sense_led;
-
 volatile static	const	uint8_t	*input_buffer;
 volatile static			uint8_t	input_buffer_length;
 volatile static			uint8_t	*output_buffer;
 volatile static			uint8_t	*output_buffer_length;
+
+static	pwm_meta_t		softpwm_meta[OUTPUT_PORTS];
+static	pwm_meta_t		pwm_meta[PWM_PORTS];
+static	counter_meta_t	counter_meta[INPUT_PORTS];
+
+static	uint8_t	duty;
+static	uint8_t	watchdog_counter;
+static	uint8_t	i2c_sense_led, input_sense_led;
 
 static	uint8_t	input_byte;
 static	uint8_t	input_command;
