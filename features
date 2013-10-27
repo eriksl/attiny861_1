@@ -43,7 +43,7 @@ MODEL 6 (ATTINY861A), VERSION 1, REVISION 3
 			1	1	0	0	0						0xc0	select analog input, returns 1 byte selected input
 
 			1	1	0	1	0						0xd0	select temperature sensor, returns 1 byte selected input
-			1	1	1	0	0						0xe0	set temperature sensor calibration values, expects 2 bytes multiplier (* 1000) + 2 bytes offset (* 1000)
+			1	1	1	0	0						0xe0	set temperature sensor calibration values, expects 2 bytes (fixed point multiplier * 1000), 2 bytes (fixed point offset * 10)
 			1	1	1	1	0						0xf0	read temperature sensor calibration values, returns same as 0xe0 input
 
 	softpwm mode =

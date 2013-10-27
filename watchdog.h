@@ -20,6 +20,6 @@ enum
 
 void watchdog_setup(uint8_t scaler);
 void watchdog_start(void);
-void watchdow_stop(void);
+void watchdog_stop(void);
 
 #endif

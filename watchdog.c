@@ -31,7 +31,7 @@ void watchdog_start(void)
 	WDTCR |= _BV(WDIE) | _BV(WDCE) | _BV(WDE);
 }
 
-void watchdow_stop(void)
+void watchdog_stop(void)
 {
 	WDTCR |= _BV(WDCE) | _BV(WDE);
 	WDTCR |= _BV(WDCE);

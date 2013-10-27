@@ -38,10 +38,10 @@ typedef struct
 	uint8_t		state;
 } counter_meta_t;
 
-volatile static	const	uint8_t	*input_buffer;
-volatile static			uint8_t	input_buffer_length;
-volatile static			uint8_t	*output_buffer;
-volatile static			uint8_t	*output_buffer_length;
+static	uint8_t	const *input_buffer;
+static	uint8_t	input_buffer_length;
+static	uint8_t	*output_buffer;
+static	uint8_t	*output_buffer_length;
 
 static	pwm_meta_t		softpwm_meta[OUTPUT_PORTS];
 static	pwm_meta_t		pwm_meta[PWM_PORTS];
@@ -55,12 +55,53 @@ static	uint8_t	input_byte;
 static	uint8_t	input_command;
 static	uint8_t	input_io;
 
-static	int32_t	temp_cal_multiplier;
-static	int32_t	temp_cal_offset;
+static	int16_t	temp_cal_multiplier;
+static	int16_t	temp_cal_offset;
 
 static	uint8_t		adc_warmup;
 static	uint16_t	adc_samples;
 static	uint32_t	adc_value;
+
+typedef struct 
+{
+	uint16_t	multiplier;
+	uint16_t	offset;
+} eeprom_temp_cal_t;
+
+typedef struct
+{
+	eeprom_temp_cal_t temp_cal[8];
+} eeprom_t;
+
+static eeprom_t *eeprom = (eeprom_t *)0;
+
+static uint16_t get_word(const uint8_t *from)
+{
+	uint16_t result;
+
+	result = from[0];
+	result <<= 8;
+	result |= from[1];
+
+	return(result);
+}
+
+#if 0
+static uint32_t get_long(const uint8_t *from)
+{
+	uint32_t result;
+
+	result = from[0];
+	result <<= 8;
+	result |= from[1];
+	result <<= 8;
+	result |= from[2];
+	result <<= 8;
+	result |= from[3];
+
+	return(result);
+}
+#endif
 
 static void put_word(uint16_t from, uint8_t *to)
 {
@@ -259,10 +300,12 @@ static inline void process_pwmmode(void)
 
 ISR(WDT_vect)
 {
-	if(watchdog_counter < 255)
-		watchdog_counter++;
+	watchdog_setup(WATCHDOG_PRESCALER_2K);
 
 	sei();
+
+	if(watchdog_counter < 255)
+		watchdog_counter++;
 
 	process_pwmmode();
 
@@ -383,8 +426,8 @@ static void extended_command()
 	return(reply_error(7));
 }
 
-static void process_command(volatile uint8_t twi_input_buffer_length, const volatile uint8_t *twi_input_buffer,
-						uint8_t volatile *twi_output_buffer_length, volatile uint8_t *twi_output_buffer)
+static void process_command(uint8_t twi_input_buffer_length, const uint8_t *twi_input_buffer,
+						uint8_t *twi_output_buffer_length, uint8_t *twi_output_buffer)
 {
 	*internal_output_ports[1].port |= _BV(internal_output_ports[1].bit);
 	i2c_sense_led = 2;
@@ -448,10 +491,11 @@ static void process_command(volatile uint8_t twi_input_buffer_length, const vola
 					value	= (int32_t)adc_value;
 					samples	= (int32_t)adc_samples;
 
+					value	*= 10;
 					value	*= temp_cal_multiplier;
 					value	/= samples;
+					value	/= 1000;
 					value	+= temp_cal_offset;
-					value	/= 100;
 
 					put_word(value, &reply_string[0]);
 					put_word(adc_samples, &reply_string[2]);
@@ -573,9 +617,7 @@ static void process_command(volatile uint8_t twi_input_buffer_length, const vola
 			if(input_io >= PWM_PORTS)
 				return(reply_error(3));
 
-			value = input_buffer[1];
-			value <<= 8;
-			value |= input_buffer[2];
+			value = get_word(&input_buffer[1]);
 
 			pwm_timer1_set_pwm(input_io, value);
 
@@ -637,16 +679,15 @@ static void process_command(volatile uint8_t twi_input_buffer_length, const vola
 			adc_samples = 0;
 			adc_value	= 0;
 
-			temp_cal_multiplier = (int32_t)eeprom_read_word((uint16_t*)((input_io * 4) + 0));
-			temp_cal_offset		= (int32_t)eeprom_read_word((uint16_t*)((input_io * 4) + 2)) * 1000;
+			temp_cal_multiplier = eeprom_read_word(&eeprom->temp_cal[input_io].multiplier);
+			temp_cal_offset		= eeprom_read_word(&eeprom->temp_cal[input_io].offset);
 
 			return(reply_char(input_io));
 		}
 
 		case(0xe0):	// set temperature sensor calibration values
 		{
-			int16_t value;
-			uint8_t replystring[4];
+			int32_t value;
 
 			if(input_io >= TEMP_PORTS)
 				return(reply_error(3));
@@ -654,33 +695,27 @@ static void process_command(volatile uint8_t twi_input_buffer_length, const vola
 			if(input_buffer_length < 5)
 				return(reply_error(4));
 
-			value = (input_buffer[1] << 8) | input_buffer[2];
-			eeprom_update_word((uint16_t*)(input_io * 4) + 0, value);
+			value = get_word(&input_buffer[1]);
+			eeprom_update_word(&eeprom->temp_cal[input_io].multiplier, value);
 
-			value = (input_buffer[3] << 8) | input_buffer[4];
-			eeprom_update_word((uint16_t*)((input_io * 4) + 2), value);
-
-			value = eeprom_read_word((uint16_t*)((input_io * 4) + 0));
-			put_word(value, &replystring[0]);
-
-			value = eeprom_read_word((uint16_t*)((input_io * 4) + 2));
-			put_word(value, &replystring[2]);
+			value = get_word(&input_buffer[3]);
+			eeprom_update_word(&eeprom->temp_cal[input_io].offset, value);
 
 			return(reply_char(input_io));
 		}
 
 		case(0xf0):	// read temperature sensor calibration values
 		{
-			int16_t value;
+			int32_t value;
 			uint8_t replystring[4];
 
 			if(input_io >= TEMP_PORTS)
 				return(reply_error(3));
 
-			value = eeprom_read_word((uint16_t*)((input_io * 4) + 0));
+			value = eeprom_read_word(&eeprom->temp_cal[input_io].multiplier);
 			put_word(value, &replystring[0]);
 
-			value = eeprom_read_word((uint16_t*)((input_io * 4) + 2));
+			value = eeprom_read_word(&eeprom->temp_cal[input_io].offset);
 			put_word(value, &replystring[2]);
 
 			return(reply(0, sizeof(replystring), replystring));
@@ -715,6 +750,8 @@ void twi_idle(void)
 int main(void)
 {
 	uint8_t slot;
+
+	watchdog_stop();
 
 	cli();
 
