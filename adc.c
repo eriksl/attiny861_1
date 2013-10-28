@@ -32,7 +32,7 @@ void adc_init(void)
 				(0	<< ADIE)	|	// !enable interrupt
 				(1	<< ADPS2)	|
 				(1	<< ADPS1)	|
-				(0	<< ADPS0);		// select clock scaler 110 = 64 = ADC runs on 122 kHz.
+				(1	<< ADPS0);		// select clock scaler 111 = 128 = ADC runs on 122 kHz.
 
 	ADCSRB	=	(0	<< BIN)		|	// !bipolair input
 				(0	<< GSEL)	|	// gain select (n/a)

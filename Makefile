@@ -5,8 +5,8 @@ PROGRAMMER	=		dragon_isp
 PRGFLAGS	=		-b 0 -P usb
 
 PROGRAM		=		main
-OBJFILES	=		adc.o ioports.o timer0.o pwm_timer1.o watchdog.o usitwislave/usitwislave.o $(PROGRAM).o
-HEADERS		=		adc.h ioports.h timer0.h pwm_timer1.h watchdog.h usitwislave/usitwislave_devices.h usitwislave/usitwislave.h
+OBJFILES	=		adc.o ioports.o timer0.o pwm_timer1.o watchdog.o eeprom.o clock.o usitwislave/usitwislave.o $(PROGRAM).o
+HEADERS		=		adc.h ioports.h timer0.h pwm_timer1.h watchdog.h eeprom.o clock.o usitwislave/usitwislave_devices.h usitwislave/usitwislave.h
 HEXFILE		=		$(PROGRAM).hex
 ELFFILE		=		$(PROGRAM).elf
 PROGRAMMED	=		.programmed

@@ -3,10 +3,11 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
-#include <avr/eeprom.h>
 
 #include <usitwislave.h>
 
+#include "clock.h"
+#include "eeprom.h"
 #include "ioports.h"
 #include "adc.h"
 #include "timer0.h"
@@ -274,8 +275,9 @@ ISR(PCINT_vect)
 	}
 }
 
-ISR(TIMER0_OVF_vect) // timer 0 softpwm overflow (default normal mode) (122 Hz)
+ISR(TIMER0_OVF_vect) // timer 0 softpwm overflow (default normal mode) (244 Hz)
 {
+	static uint8_t pwm_divisor = 0;
 	sei();
 
 	if(timer0_get_compa() == 0)
@@ -291,7 +293,11 @@ ISR(TIMER0_OVF_vect) // timer 0 softpwm overflow (default normal mode) (122 Hz)
 	if(init_counter < 255)
 		init_counter++;
 
-	process_pwmmode();
+	if(++pwm_divisor > 4)
+	{
+		process_pwmmode();
+		pwm_divisor = 0;
+	}
 
 	if(i2c_sense_led == 1)
 		*internal_output_ports[1].port &= ~_BV(internal_output_ports[1].bit);
@@ -683,8 +689,8 @@ static void process_command(uint8_t twi_input_buffer_length, const uint8_t *twi_
 			adc_samples = 0;
 			adc_value	= 0;
 
-			temp_cal_multiplier = eeprom_read_word(&eeprom->temp_cal[input_io].multiplier);
-			temp_cal_offset		= eeprom_read_word(&eeprom->temp_cal[input_io].offset);
+			temp_cal_multiplier = eeprom_read_uint16(&eeprom->temp_cal[input_io].multiplier);
+			temp_cal_offset		= eeprom_read_uint16(&eeprom->temp_cal[input_io].offset);
 
 			return(reply_char(input_io));
 		}
@@ -700,10 +706,10 @@ static void process_command(uint8_t twi_input_buffer_length, const uint8_t *twi_
 				return(reply_error(4));
 
 			value = get_word(&input_buffer[1]);
-			eeprom_update_word(&eeprom->temp_cal[input_io].multiplier, value);
+			eeprom_write_uint16(&eeprom->temp_cal[input_io].multiplier, value);
 
 			value = get_word(&input_buffer[3]);
-			eeprom_update_word(&eeprom->temp_cal[input_io].offset, value);
+			eeprom_write_uint16(&eeprom->temp_cal[input_io].offset, value);
 
 			return(reply_char(input_io));
 		}
@@ -716,10 +722,10 @@ static void process_command(uint8_t twi_input_buffer_length, const uint8_t *twi_
 			if(input_io >= TEMP_PORTS)
 				return(reply_error(3));
 
-			value = eeprom_read_word(&eeprom->temp_cal[input_io].multiplier);
+			value = eeprom_read_uint16(&eeprom->temp_cal[input_io].multiplier);
 			put_word(value, &replystring[0]);
 
-			value = eeprom_read_word(&eeprom->temp_cal[input_io].offset);
+			value = eeprom_read_uint16(&eeprom->temp_cal[input_io].offset);
 			put_word(value, &replystring[2]);
 
 			return(reply(0, sizeof(replystring), replystring));
@@ -811,13 +817,13 @@ int main(void)
 
 	adc_init();
 
-	// 8 mhz / 256 / 256 = 122 Hz
+	// 16 mhz / 256 / 256 = 244 Hz
 	timer0_init(TIMER0_PRESCALER_256);
 	timer0_set_compa(0x00);
 	timer0_set_compb(0x00);
 	timer0_start();
 
-	// 8 mhz / 32 / 1024 = 244 Hz
+	// 16 mhz / 64 / 1024 = 244 Hz
 	pwm_timer1_init(PWM_TIMER1_PRESCALER_32);
 	pwm_timer1_set_max(0x3ff);
 	pwm_timer1_start();
