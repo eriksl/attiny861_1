@@ -49,7 +49,7 @@ static	pwm_meta_t		pwm_meta[PWM_PORTS];
 static	counter_meta_t	counter_meta[INPUT_PORTS];
 
 static	uint8_t	duty;
-static	uint8_t	watchdog_counter;
+static	uint8_t	init_counter;
 static	uint8_t	i2c_sense_led, input_sense_led;
 
 static	uint8_t	input_byte;
@@ -116,58 +116,6 @@ static void put_long(uint32_t from, uint8_t *to)
 	to[1] = (from >> 16) & 0xff;
 	to[2] = (from >>  8) & 0xff;
 	to[3] = (from >>  0) & 0xff;
-}
-
-ISR(PCINT_vect)
-{
-	static uint8_t pc_dirty, pc_slot;
-
-	if(watchdog_counter < 4)
-		return;
-
-	for(pc_slot = 0, pc_dirty = 0; pc_slot < INPUT_PORTS; pc_slot++)
-	{
-		if((*input_ports[pc_slot].pin & _BV(input_ports[pc_slot].bit)) ^ counter_meta[pc_slot].state)
-		{
-			counter_meta[pc_slot].counter++;
-			pc_dirty = 1;
-		}
-
-		counter_meta[pc_slot].state = *input_ports[pc_slot].pin & _BV(input_ports[pc_slot].bit);
-	}
-
-	sei();
-
-	if(pc_dirty)
-	{
-		*internal_output_ports[0].port |= _BV(internal_output_ports[0].bit);
-		input_sense_led = 8;
-	}
-}
-
-ISR(TIMER0_OVF_vect) // timer 0 softpwm overflow (default normal mode)
-{
-	if(timer0_get_compa() == 0)
-		*output_ports[0].port &= ~_BV(output_ports[0].bit);
-	else
-		*output_ports[0].port |=  _BV(output_ports[0].bit);
-
-	if(timer0_get_compb() == 0)
-		*output_ports[1].port &= ~_BV(output_ports[1].bit);
-	else
-		*output_ports[1].port |=  _BV(output_ports[1].bit);
-}
-
-ISR(TIMER0_COMPA_vect) // timer 0 softpwm port 1 trigger
-{
-	if(timer0_get_compa() != 0xff)
-		*output_ports[0].port &= ~_BV(output_ports[0].bit);
-}
-
-ISR(TIMER0_COMPB_vect) // timer 0 softpwm port 2 trigger
-{
-	if(timer0_get_compb() != 0xff)
-		*output_ports[1].port &= ~_BV(output_ports[1].bit);
 }
 
 static inline void process_pwmmode(void)
@@ -299,14 +247,49 @@ static inline void process_pwmmode(void)
 	}
 }
 
-ISR(WDT_vect)
+ISR(PCINT_vect)
 {
-	watchdog_setup(WATCHDOG_PRESCALER_2K);
+	static uint8_t pc_dirty, pc_slot;
+
+	if(init_counter < 16)	// discard spurious first few interrupts
+		return;
+
+	for(pc_slot = 0, pc_dirty = 0; pc_slot < INPUT_PORTS; pc_slot++)
+	{
+		if((*input_ports[pc_slot].pin & _BV(input_ports[pc_slot].bit)) ^ counter_meta[pc_slot].state)
+		{
+			counter_meta[pc_slot].counter++;
+			pc_dirty = 1;
+		}
+
+		counter_meta[pc_slot].state = *input_ports[pc_slot].pin & _BV(input_ports[pc_slot].bit);
+	}
 
 	sei();
 
-	if(watchdog_counter < 255)
-		watchdog_counter++;
+	if(pc_dirty)
+	{
+		*internal_output_ports[0].port |= _BV(internal_output_ports[0].bit);
+		input_sense_led = led_timeout;
+	}
+}
+
+ISR(TIMER0_OVF_vect) // timer 0 softpwm overflow (default normal mode) (122 Hz)
+{
+	sei();
+
+	if(timer0_get_compa() == 0)
+		*output_ports[0].port &= ~_BV(output_ports[0].bit);
+	else
+		*output_ports[0].port |=  _BV(output_ports[0].bit);
+
+	if(timer0_get_compb() == 0)
+		*output_ports[1].port &= ~_BV(output_ports[1].bit);
+	else
+		*output_ports[1].port |=  _BV(output_ports[1].bit);
+
+	if(init_counter < 255)
+		init_counter++;
 
 	process_pwmmode();
 
@@ -321,8 +304,22 @@ ISR(WDT_vect)
 
 	if(input_sense_led > 0)
 		input_sense_led--;
+}
 
-	watchdog_setup(WATCHDOG_PRESCALER_2K);
+ISR(TIMER0_COMPA_vect) // timer 0 softpwm port 1 trigger
+{
+	sei();
+
+	if(timer0_get_compa() != 0xff)
+		*output_ports[0].port &= ~_BV(output_ports[0].bit);
+}
+
+ISR(TIMER0_COMPB_vect) // timer 0 softpwm port 2 trigger
+{
+	sei();
+
+	if(timer0_get_compb() != 0xff)
+		*output_ports[1].port &= ~_BV(output_ports[1].bit);
 }
 
 static void reply(uint8_t error_code, uint8_t reply_length, const uint8_t *reply_string)

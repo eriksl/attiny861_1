@@ -10,8 +10,8 @@ HEADERS		=		adc.h ioports.h timer0.h pwm_timer1.h watchdog.h usitwislave/usitwis
 HEXFILE		=		$(PROGRAM).hex
 ELFFILE		=		$(PROGRAM).elf
 PROGRAMMED	=		.programmed
-CFLAGS		=		--std=c99 -I$(CURDIR) \
-					-Wall -Winline -Os -mmcu=$(MCU) -DF_CPU=$(MCUSPEED) -DUSE_CRYSTAL=$(USE_CRYSTAL) -Iusitwislave -DUSI_ON_PORT_A \
+CFLAGS		=		-Iusitwislave -DUSI_ON_PORT_A -I$(CURDIR) \
+					--std=c99 -Wall -Winline -Os -mmcu=$(MCU) -DF_CPU=$(MCUSPEED) -DUSE_CRYSTAL=$(USE_CRYSTAL) \
 					-fpack-struct -funroll-loops -funit-at-a-time -fno-keep-static-consts -frename-registers
 LDFLAGS		=		-Wall -mmcu=$(MCU)
 
