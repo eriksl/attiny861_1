@@ -50,7 +50,7 @@ static	pwm_meta_t		pwm_meta[PWM_PORTS];
 static	counter_meta_t	counter_meta[INPUT_PORTS];
 
 static	uint8_t	duty;
-static	uint8_t	init_counter;
+static	uint8_t	init_counter = 0;
 static	uint8_t	i2c_sense_led, input_sense_led;
 
 static	uint8_t	input_byte;
@@ -449,6 +449,8 @@ static void process_command(uint8_t twi_input_buffer_length, const uint8_t *twi_
 	input_command	= input_byte & 0xf8;
 	input_io		= input_byte & 0x07;
 
+	watchdog_reset();
+
 	switch(input_command)
 	{
 		case(0x00):	// short / no-io
@@ -465,7 +467,7 @@ static void process_command(uint8_t twi_input_buffer_length, const uint8_t *twi_
 					} id =
 					{
 						0x4a, 0xfb,
-						0x06, 0x01, 0x03,
+						0x06, 0x01, 0x05,
 						"attiny861a",
 					};
 
@@ -861,6 +863,8 @@ int main(void)
 
 	watchdog_setup(WATCHDOG_PRESCALER_1024K);	//	8.0 seconds timeout
 	watchdog_start();
+
+	sei();
 
 	usi_twi_slave(0x02, 1, process_command, twi_idle);
 }

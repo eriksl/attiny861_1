@@ -54,7 +54,7 @@ $(HEXFILE):			$(ELFFILE)
 
 $(PROGRAMMED):		$(HEXFILE)
 					@echo "AVRDUDE $^"
-					@avrdude -vv -c $(PROGRAMMER) -p $(MCU) $(PRGFLAGS) -U flash:w:$^
+					@avrdude -vv -c $(PROGRAMMER) -p $(MCU) $(PRGFLAGS) -U flash:w:$^ -U lfuse:w:0xf1:m -U hfuse:w:0xd5:m
 
 clean:			
 					@echo "RM $(OBJFILES) $(ELFFILE) $(HEXFILE) $(PROGRAMMED)"
