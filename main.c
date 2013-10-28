@@ -15,7 +15,8 @@
 
 enum
 {
-	adc_warmup_init = 8
+	adc_warmup_init = 8,
+	led_timeout = 8
 };
 
 typedef enum
@@ -430,7 +431,7 @@ static void process_command(uint8_t twi_input_buffer_length, const uint8_t *twi_
 						uint8_t *twi_output_buffer_length, uint8_t *twi_output_buffer)
 {
 	*internal_output_ports[1].port |= _BV(internal_output_ports[1].bit);
-	i2c_sense_led = 2;
+	i2c_sense_led = led_timeout;
 
 	input_buffer_length		= twi_input_buffer_length;
 	input_buffer			= twi_input_buffer;

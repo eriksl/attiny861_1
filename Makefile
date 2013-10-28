@@ -1,6 +1,6 @@
 MCU			=		attiny861
 USE_CRYSTAL	=		0
-MCUSPEED	=		8000000
+MCUSPEED	=		16000000
 PROGRAMMER	=		dragon_isp
 PRGFLAGS	=		-b 0 -P usb
 
