@@ -23,6 +23,7 @@ MODEL 6 (ATTINY861A), VERSION 1, REVISION 3
 																	DD[7] = ascii id string
 			0	0	0	0	0		0	0	1		0x01	read analog input, returns 2 bytes sample count, 4 bytes total value
 			0	0	0	0	0		0	1	0		0x02	read temperature sensor, returns 2 bytes temperature * 10, 2 bytes raw sample count, 4 bytes total raw value
+			0	0	0	0	0		1	1	0		0x06	test watchdog
 			0	0	0	0	0		1	1	1		0x07	extended command, rest follows after this byte
 
 			0	0	0	1	0						0x10	read counter, returns 4 bytes

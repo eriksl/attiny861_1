@@ -506,6 +506,12 @@ static void process_command(uint8_t twi_input_buffer_length, const uint8_t *twi_
 					return(reply(0, sizeof(reply_string), reply_string));
 				}
 
+				case(0x06): // test watchdog
+				{
+					for(;;)
+						(void)0;
+				}
+
 				case(0x07): // extended command
 				{
 					return(extended_command());
@@ -743,6 +749,8 @@ void twi_idle(void)
 		adc_value += adc_read();
 		adc_start();
 	}
+
+	watchdog_reset();
 }
 
 int main(void)
@@ -841,12 +849,12 @@ int main(void)
 		}
 	}
 
-	watchdog_setup(WATCHDOG_PRESCALER_2K);
-	watchdog_start();
-
 	adc_warmup	= adc_warmup_init;
 	adc_samples	= 0;
 	adc_value	= 0;
+
+	watchdog_setup(WATCHDOG_PRESCALER_1024K);	//	8.0 seconds timeout
+	watchdog_start();
 
 	usi_twi_slave(0x02, 1, process_command, twi_idle);
 }

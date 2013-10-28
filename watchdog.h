@@ -22,4 +22,9 @@ void watchdog_setup(uint8_t scaler);
 void watchdog_start(void);
 void watchdog_stop(void);
 
+static void inline watchdog_reset(void)
+{
+	__builtin_avr_wdr();
+}
+
 #endif
