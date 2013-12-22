@@ -2,7 +2,7 @@
 #define _TIMER0_H_
 
 #include <stdint.h>
-#include <avr/io.h>
+#include "avr.h"
 
 enum
 {
@@ -17,13 +17,13 @@ enum
 		void		timer0_init(uint8_t scaler);
 static	void		timer0_reset_counter(void);
 static	uint8_t		timer0_get_counter(void);
-static	void		timer0_set_compa(uint8_t);
-static	void		timer0_set_compb(uint8_t);
-static	uint8_t		timer0_get_compa(void);
-static	uint8_t		timer0_get_compb(void);
 		void		timer0_start(void);
 		void		timer0_stop(void);
 		uint8_t		timer0_status(void);
+		uint16_t	timer0_get_compa(void);
+		void		timer0_set_compa(uint16_t);
+		uint16_t	timer0_get_compb(void);
+		void		timer0_set_compb(uint16_t);
 
 static inline void timer0_reset_counter(void)
 {
@@ -33,26 +33,6 @@ static inline void timer0_reset_counter(void)
 static inline uint8_t timer0_get_counter(void)
 {
 	return(TCNT0L);
-}
-
-static inline void timer0_set_compa(uint8_t value)
-{
-	OCR0A = value;
-}
-
-static inline void timer0_set_compb(uint8_t value)
-{
-	OCR0B = value;
-}
-
-static inline uint8_t timer0_get_compa(void)
-{
-	return(OCR0A);
-}
-
-static inline uint8_t timer0_get_compb(void)
-{
-	return(OCR0B);
 }
 
 #endif

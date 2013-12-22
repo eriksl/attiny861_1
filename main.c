@@ -1,11 +1,11 @@
 #include <stdint.h>
 
-#include <avr/io.h>
 #include <avr/interrupt.h>
 #include <util/delay.h>
 
 #include <usitwislave.h>
 
+#include "avr.h"
 #include "clock.h"
 #include "eeprom.h"
 #include "ioports.h"
@@ -17,41 +17,18 @@
 enum
 {
 	adc_warmup_init = 8,
-	led_timeout = 8
+	command_led_timeout = 8,
+	if_active_led_timeout = 2,
+	phy_buffer_size = USI_TWI_BUFFER_SIZE
 };
 
-typedef enum
-{
-	pwm_mode_none				= 0,
-	pwm_mode_fade_in			= 1,
-	pwm_mode_fade_out			= 2,
-	pwm_mode_fade_in_out_cont	= 3,
-	pwm_mode_fade_out_in_cont	= 4
-} pwm_mode_t;
-
-typedef struct
-{
-	pwm_mode_t	pwm_mode:8;
-} pwm_meta_t;
-
-typedef struct
-{
-	uint32_t	counter;
-	uint8_t		state;
-} counter_meta_t;
-
-static	uint8_t	const *input_buffer;
-static	uint8_t	input_buffer_length;
-static	uint8_t	*output_buffer;
-static	uint8_t	*output_buffer_length;
-
-static	pwm_meta_t		softpwm_meta[OUTPUT_PORTS];
-static	pwm_meta_t		pwm_meta[PWM_PORTS];
-static	counter_meta_t	counter_meta[INPUT_PORTS];
-
+static	uint8_t	const *phy_receive_buffer;
+static	uint8_t	phy_receive_buffer_length;
+static	uint8_t	*phy_send_buffer;
+static	uint8_t	*phy_send_buffer_length;
 static	uint8_t	duty;
 static	uint8_t	init_counter = 0;
-static	uint8_t	i2c_sense_led, input_sense_led;
+static	uint8_t	if_sense_led, input_sense_led;
 
 static	uint8_t	input_byte;
 static	uint8_t	input_command;
@@ -119,191 +96,112 @@ static void put_long(uint32_t from, uint8_t *to)
 	to[3] = (from >>  0) & 0xff;
 }
 
-static inline void process_pwmmode(void)
+static void process_fading(void)
 {
-	static uint8_t			pm_slot, pm_duty, pm_diff;
-	static uint16_t			pm_duty16, pm_diff16;
+	static uint8_t		output_index;
+	static pwmport_t*	output_slot;
+	static uint16_t		current, low, high, step;
 
-	for(pm_slot = 0; pm_slot < OUTPUT_PORTS; pm_slot++)
+	for(output_index = 0; output_index < OUTPUT_PORTS; output_index++)
 	{
-		if(pm_slot == 0)
-			pm_duty = timer0_get_compa();
-		else
-			pm_duty = timer0_get_compb();
+		output_slot = &output_ports[output_index];
 
-		pm_diff	= pm_duty / 10;
+		if((step = output_slot->step) == 0)
+			continue;
 
-		if(pm_diff < 3)
-			pm_diff = 3;
+		if(!output_slot->set)
+			continue;
 
-		switch(softpwm_meta[pm_slot].pwm_mode)
+		current	= output_slot->current;
+		low		= output_slot->limit_low;
+		high	= output_slot->limit_high;
+
+		if(output_slot->direction)											// up
 		{
-			case(pwm_mode_none):
+			if(((current + step) < current) || ((current + step) > high))	// wrap or threshold
 			{
-				break;
+				current = high;
+				output_slot->direction = 0;									// down
 			}
-			case(pwm_mode_fade_in):
-			case(pwm_mode_fade_in_out_cont):
-			{
-				if(pm_duty < (255 - pm_diff))
-					pm_duty += pm_diff;
-				else
-				{
-					pm_duty = 255;
-
-					if(softpwm_meta[pm_slot].pwm_mode == pwm_mode_fade_in)
-						softpwm_meta[pm_slot].pwm_mode = pwm_mode_none;
-					else
-						softpwm_meta[pm_slot].pwm_mode = pwm_mode_fade_out_in_cont;
-				}
-
-				if(pm_slot == 0)
-					timer0_set_compa(pm_duty);
-				else
-					timer0_set_compb(pm_duty);
-
-				break;
-			}
-
-			case(pwm_mode_fade_out):
-			case(pwm_mode_fade_out_in_cont):
-			{
-				if(pm_duty > pm_diff)
-					pm_duty -= pm_diff;
-				else
-				{
-					pm_duty = 0;
-
-					if(softpwm_meta[pm_slot].pwm_mode == pwm_mode_fade_out)
-						softpwm_meta[pm_slot].pwm_mode = pwm_mode_none;
-					else
-						softpwm_meta[pm_slot].pwm_mode = pwm_mode_fade_in_out_cont;
-				}
-
-				if(pm_slot == 0)
-					timer0_set_compa(pm_duty);
-				else
-					timer0_set_compb(pm_duty);
-
-				break;
-			}
-		}
-	}
-
-	for(pm_slot = 0; pm_slot < PWM_PORTS; pm_slot++)
-	{
-		pm_duty16	= pwm_timer1_get_pwm(pm_slot);
-		pm_diff16	= pm_duty16 / 8;
-
-		if(pm_diff16 < 8)
-			pm_diff16 = 8;
-
-		switch(pwm_meta[pm_slot].pwm_mode)
+			else
+				current += step;
+		} 
+		else																// down
 		{
-			case(pwm_mode_none):
+			if(((current - step) > current) || ((current - step) < low))	// wrap or threshold
 			{
-				break;
+				current = low;
+				output_slot->direction = 1;									//up
 			}
-
-			case(pwm_mode_fade_in):
-			case(pwm_mode_fade_in_out_cont):
-			{
-				if(pm_duty16 < (1020 - pm_diff16))
-					pm_duty16 += pm_diff16;
-				else
-				{
-					pm_duty16 = 1020;
-
-					if(pwm_meta[pm_slot].pwm_mode == pwm_mode_fade_in)
-						pwm_meta[pm_slot].pwm_mode = pwm_mode_none;
-					else
-						pwm_meta[pm_slot].pwm_mode = pwm_mode_fade_out_in_cont;
-				}
-
-				pwm_timer1_set_pwm(pm_slot, pm_duty16);
-
-				break;
-			}
-
-			case(pwm_mode_fade_out):
-			case(pwm_mode_fade_out_in_cont):
-			{
-				if(pm_duty16 > pm_diff16)
-					pm_duty16 -= pm_diff16;
-				else
-				{
-					pm_duty16 = 0;
-
-					if(pwm_meta[pm_slot].pwm_mode == pwm_mode_fade_out)
-						pwm_meta[pm_slot].pwm_mode = pwm_mode_none;
-					else
-						pwm_meta[pm_slot].pwm_mode = pwm_mode_fade_in_out_cont;
-				}
-
-				pwm_timer1_set_pwm(pm_slot, pm_duty16);
-
-				break;
-			}
+			else
+				current -= step;
 		}
+
+		output_slot->current = current;
+		output_slot->set(current);
 	}
 }
 
-ISR(PCINT_vect)
+ISR(PCINT_vect, ISR_NOBLOCK)
 {
-	static uint8_t pc_dirty, pc_slot;
+	static uint8_t	pc_dirty, pc_index;
+	static inport_t *input_slot;
 
 	if(init_counter < 16)	// discard spurious first few interrupts
 		return;
 
-	for(pc_slot = 0, pc_dirty = 0; pc_slot < INPUT_PORTS; pc_slot++)
+	for(pc_index = 0, pc_dirty = 0; pc_index < INPUT_PORTS; pc_index++)
 	{
-		if((*input_ports[pc_slot].pin & _BV(input_ports[pc_slot].bit)) ^ counter_meta[pc_slot].state)
+		input_slot = &input_ports[pc_index];
+
+		if((*input_slot->pin & _BV(input_slot->bit)) ^ input_slot->state)
 		{
-			counter_meta[pc_slot].counter++;
+			input_slot->counter++;
 			pc_dirty = 1;
 		}
 
-		counter_meta[pc_slot].state = *input_ports[pc_slot].pin & _BV(input_ports[pc_slot].bit);
+		input_slot->state = *input_slot->pin & _BV(input_slot->bit);
 	}
-
-	sei();
 
 	if(pc_dirty)
 	{
 		*internal_output_ports[0].port |= _BV(internal_output_ports[0].bit);
-		input_sense_led = led_timeout;
+		input_sense_led = command_led_timeout;
 	}
 }
 
-ISR(TIMER0_OVF_vect) // timer 0 softpwm overflow (default normal mode) (244 Hz)
+ISR(TIMER0_OVF_vect, ISR_NOBLOCK) // timer 0 softpwm overflow (default normal mode) (244 Hz)
 {
 	static uint8_t pwm_divisor = 0;
-	sei();
 
-	if(timer0_get_compa() == 0)
-		*output_ports[0].port &= ~_BV(output_ports[0].bit);
+#if (PLAIN_OUTPUT_PORTS > 0)
+	if(output_ports[PWM_OUTPUT_PORTS + 0].current == 0)
+		*output_ports[PWM_OUTPUT_PORTS + 0].port &= ~_BV(output_ports[PWM_OUTPUT_PORTS + 0].bit);
 	else
-		*output_ports[0].port |=  _BV(output_ports[0].bit);
+		*output_ports[PWM_OUTPUT_PORTS + 0].port |=  _BV(output_ports[PWM_OUTPUT_PORTS + 0].bit);
+#endif
 
-	if(timer0_get_compb() == 0)
-		*output_ports[1].port &= ~_BV(output_ports[1].bit);
+#if (PLAIN_OUTPUT_PORTS > 1)
+	if(output_ports[PWM_OUTPUT_PORTS + 1].current == 0)
+		*output_ports[PWM_OUTPUT_PORTS + 1].port &= ~_BV(output_ports[PWM_OUTPUT_PORTS + 1].bit);
 	else
-		*output_ports[1].port |=  _BV(output_ports[1].bit);
+		*output_ports[PWM_OUTPUT_PORTS + 1].port |=  _BV(output_ports[PWM_OUTPUT_PORTS + 1].bit);
+#endif
 
 	if(init_counter < 255)
 		init_counter++;
 
 	if(++pwm_divisor > 4)
 	{
-		process_pwmmode();
+		process_fading();
 		pwm_divisor = 0;
 	}
 
-	if(i2c_sense_led == 1)
+	if(if_sense_led == 1)
 		*internal_output_ports[1].port &= ~_BV(internal_output_ports[1].bit);
 
-	if(i2c_sense_led > 0)
-		i2c_sense_led--;
+	if(if_sense_led > 0)
+		if_sense_led--;
 
 	if(input_sense_led == 1)
 		*internal_output_ports[0].port &= ~_BV(internal_output_ports[0].bit);
@@ -312,20 +210,16 @@ ISR(TIMER0_OVF_vect) // timer 0 softpwm overflow (default normal mode) (244 Hz)
 		input_sense_led--;
 }
 
-ISR(TIMER0_COMPA_vect) // timer 0 softpwm port 1 trigger
+ISR(TIMER0_COMPA_vect, ISR_NOBLOCK) // timer 0 softpwm port 1 trigger
 {
-	sei();
-
 	if(timer0_get_compa() != 0xff)
-		*output_ports[0].port &= ~_BV(output_ports[0].bit);
+		*output_ports[PWM_OUTPUT_PORTS + 0].port &= ~_BV(output_ports[PWM_OUTPUT_PORTS + 0].bit);
 }
 
-ISR(TIMER0_COMPB_vect) // timer 0 softpwm port 2 trigger
+ISR(TIMER0_COMPB_vect, ISR_NOBLOCK) // timer 0 softpwm port 2 trigger
 {
-	sei();
-
 	if(timer0_get_compb() != 0xff)
-		*output_ports[1].port &= ~_BV(output_ports[1].bit);
+		*output_ports[PWM_OUTPUT_PORTS + 1].port &= ~_BV(output_ports[PWM_OUTPUT_PORTS + 1].bit);
 }
 
 static void reply(uint8_t error_code, uint8_t reply_length, const uint8_t *reply_string)
@@ -333,26 +227,26 @@ static void reply(uint8_t error_code, uint8_t reply_length, const uint8_t *reply
 	uint8_t checksum;
 	uint8_t ix;
 
-	if((reply_length + 4) > USI_TWI_BUFFER_SIZE)
+	if((reply_length + 4) > phy_buffer_size)
 		return;
 
-	output_buffer[0] = 3 + reply_length;
-	output_buffer[1] = error_code;
-	output_buffer[2] = input_byte;
+	phy_send_buffer[0] = 3 + reply_length;
+	phy_send_buffer[1] = error_code;
+	phy_send_buffer[2] = input_byte;
 
 	for(ix = 0; ix < reply_length; ix++)
-		output_buffer[3 + ix] = reply_string[ix];
+		phy_send_buffer[3 + ix] = reply_string[ix];
 
 	for(ix = 1, checksum = 0; ix < (3 + reply_length); ix++)
-		checksum += output_buffer[ix];
+		checksum += phy_send_buffer[ix];
 
-	output_buffer[3 + reply_length] = checksum;
-	*output_buffer_length = 3 + reply_length + 1;
+	phy_send_buffer[3 + reply_length] = checksum;
+	*phy_send_buffer_length = 3 + reply_length + 1;
 }
 
 static void reply_char(uint8_t value)
 {
-	reply(0, sizeof(value), &value);
+	return(reply(0, sizeof(value), &value));
 }
 
 static void reply_short(uint16_t value)
@@ -361,7 +255,7 @@ static void reply_short(uint16_t value)
 
 	put_word(value, reply_string);
 
-	reply(0, sizeof(reply_string), reply_string);
+	return(reply(0, sizeof(reply_string), reply_string));
 }
 
 static void reply_long(uint32_t value)
@@ -370,82 +264,35 @@ static void reply_long(uint32_t value)
 
 	put_long(value, reply_string);
 
-	reply(0, sizeof(reply_string), reply_string);
+	return(reply(0, sizeof(reply_string), reply_string));
 }
 
 static void reply_error(uint8_t error_code)
 {
-	reply(error_code, 0, 0);
+	return(reply(error_code, 0, 0));
 }
 
-static void extended_command()
+static void reply_ok(void)
 {
-	struct
-	{
-		uint8_t	amount;
-		uint8_t	data[4];
-	} control_info;
-
-	switch(input_buffer[1])
-	{
-		case(0x00):	// get digital inputs
-		{
-			control_info.amount = INPUT_PORTS;
-			put_long(0x3fffffff, &control_info.data[0]);
-			return(reply(0, sizeof(control_info), (uint8_t *)&control_info));
-		}
-
-		case(0x01):	// get analog inputs
-		{
-			control_info.amount = ANALOG_PORTS;
-			put_word(0x0000, &control_info.data[0]);
-			put_word(0x03ff, &control_info.data[2]);
-			return(reply(0, sizeof(control_info), (uint8_t *)&control_info));
-		}
-
-		case(0x02):	// get digital outputs
-		{
-			control_info.amount = OUTPUT_PORTS;
-			put_word(0x0000, &control_info.data[0]);
-			put_word(0x00ff, &control_info.data[2]);
-			return(reply(0, sizeof(control_info), (uint8_t *)&control_info));
-		}
-
-		case(0x03):	// get pwm outputs
-		{
-			control_info.amount = PWM_PORTS;
-			put_word(0x0000, &control_info.data[0]);
-			put_word(0x03ff, &control_info.data[2]);
-			return(reply(0, sizeof(control_info), (uint8_t *)&control_info));
-		}
-
-		case(0x04):	// get temperature sensors
-		{
-			control_info.amount = TEMP_PORTS;
-			put_long(0x00, &control_info.data[0]);
-			return(reply(0, sizeof(control_info), (uint8_t *)&control_info));
-		}
-	}
-
-	return(reply_error(7));
+	return(reply(0, 0, 0));
 }
 
-static void process_command(uint8_t twi_input_buffer_length, const uint8_t *twi_input_buffer,
-						uint8_t *twi_output_buffer_length, uint8_t *twi_output_buffer)
+static void process_input(uint8_t if_input_buffer_length, const uint8_t *if_input_buffer,
+						uint8_t *if_output_buffer_length, uint8_t *if_output_buffer)
 {
 	*internal_output_ports[1].port |= _BV(internal_output_ports[1].bit);
-	i2c_sense_led = led_timeout;
+	if_sense_led = command_led_timeout;
 
-	input_buffer_length		= twi_input_buffer_length;
-	input_buffer			= twi_input_buffer;
+	phy_receive_buffer_length	= if_input_buffer_length;
+	phy_receive_buffer			= if_input_buffer;
 
-	output_buffer_length	= twi_output_buffer_length;
-	output_buffer			= twi_output_buffer;
+	phy_send_buffer_length	= if_output_buffer_length;
+	phy_send_buffer			= if_output_buffer;
 
-	if(input_buffer_length < 1)
+	if(phy_receive_buffer_length < 1)
 		return(reply_error(1));
 
-	input_byte		= input_buffer[0];
+	input_byte		= phy_receive_buffer[0];
 	input_command	= input_byte & 0xf8;
 	input_io		= input_byte & 0x07;
 
@@ -459,15 +306,17 @@ static void process_command(uint8_t twi_input_buffer_length, const uint8_t *twi_
 			{
 				case(0x00):	// identify
 				{
-					struct
+					static const struct
 					{
 						uint8_t id1, id2;
 						uint8_t model, version, revision;
-						uint8_t name[16];
+						uint8_t digital_inputs, analog_inputs, temperature_sensors, digital_outputs;
+						uint8_t name[12];
 					} id =
 					{
 						0x4a, 0xfb,
-						0x06, 0x01, 0x05,
+						0x06, 0x01, 0x06,
+						INPUT_PORTS, ANALOG_PORTS, TEMP_PORTS, OUTPUT_PORTS,
 						"attiny861a",
 					};
 
@@ -477,9 +326,10 @@ static void process_command(uint8_t twi_input_buffer_length, const uint8_t *twi_
 				case(0x01):	// read analog input
 				{
 					uint8_t reply_string[6];
+					uint32_t scaled_value = adc_value << 6; // scale 10 bits to 16 bits
 
 					put_word(adc_samples, &reply_string[0]);
-					put_long(adc_value, &reply_string[2]);
+					put_long(scaled_value, &reply_string[2]);
 					adc_warmup	= adc_warmup_init;
 					adc_samples = 0;
 					adc_value	= 0;
@@ -520,11 +370,6 @@ static void process_command(uint8_t twi_input_buffer_length, const uint8_t *twi_
 						(void)0;
 				}
 
-				case(0x07): // extended command
-				{
-					return(extended_command());
-				}
-
 				default:
 				{
 					return(reply_error(7));
@@ -540,10 +385,10 @@ static void process_command(uint8_t twi_input_buffer_length, const uint8_t *twi_
 			if(input_io >= INPUT_PORTS)
 				return(reply_error(3));
 
-			uint32_t counter = counter_meta[input_io].counter;
+			uint32_t counter = input_ports[input_io].counter;
 
 			if(input_command == 0x20)
-				counter_meta[input_io].counter = 0;
+				input_ports[input_io].counter = 0;
 
 			return(reply_long(counter));
 		}
@@ -560,112 +405,105 @@ static void process_command(uint8_t twi_input_buffer_length, const uint8_t *twi_
 			return(reply_char(value));
 		}
 
-		case(0x40):	//	write output / softpwm
+		case(0x40):	// write output static value=uint16/scaled
 		{
-			uint8_t value;
+			uint16_t	value;
+			pwmport_t	*port;
 
-			if(input_buffer_length < 2)
+			if(phy_receive_buffer_length != 3)
 				return(reply_error(4));
 
 			if(input_io >= OUTPUT_PORTS)
 				return(reply_error(3));
 
-			value = input_buffer[1];
+			port = &output_ports[input_io];
 
-			if(input_io == 0)
-				timer0_set_compa(value);
+			port->step = 0;
+			value = get_word(&phy_receive_buffer[1]);
+			port->current = port->limit_high = port->limit_low = value; // disable stepping
+
+			if(port->set) // pwm possible
+			{
+				port->set(value);
+				if(value == 0)
+					*port->port &= ~_BV(port->bit);
+				else
+					if(value == 0xffff)
+						*port->port |=  _BV(port->bit);
+			}
 			else
-				timer0_set_compb(value);
+			{
+				if(value)
+					*port->port |=  _BV(port->bit);
+				else
+					*port->port &= ~_BV(port->bit);
+			}
 
-			return(reply_char(value));
+			return(reply_ok());
 		}
 
-		case(0x50):	// read output / softpwm
-		{
-			uint8_t value;
-
-			if(input_io >= OUTPUT_PORTS)
-				return(reply_error(3));
-
-			if(input_io == 0)
-				value = timer0_get_compa();
-			else
-				value = timer0_get_compb();
-
-			return(reply_char(value));
-		}
-
-		case(0x60): // write softpwm mode
-		{
-			if(input_buffer_length < 2)
-				return(reply_error(4));
-
-			if(input_io >= OUTPUT_PORTS)
-				return(reply_error(3));
-
-			if(input_buffer[1] > 3)
-				return(reply_error(3));
-
-			softpwm_meta[input_io].pwm_mode = input_buffer[1];
-
-			return(reply_char(input_buffer[1]));
-		}
-
-		case(0x70):	// read softpwm mode
-		{
-			if(input_io >= OUTPUT_PORTS)
-				return(reply_error(3));
-
-			return(reply_char(softpwm_meta[input_io].pwm_mode));
-		}
-
-		case(0x80): // write pwm
+		case(0x50):	// read	output static value=uint16/scaled
 		{
 			uint16_t value;
 
-			if(input_buffer_length < 3)
-				return(reply_error(4));
-
-			if(input_io >= PWM_PORTS)
+			if(input_io >= OUTPUT_PORTS)
 				return(reply_error(3));
 
-			value = get_word(&input_buffer[1]);
-
-			pwm_timer1_set_pwm(input_io, value);
+			if(output_ports[input_io].get) // pwm possible
+				value = output_ports[input_io].get();
+			else
+			{
+				if(*output_ports[input_io].port & _BV(output_ports[input_io].bit))
+					value = 0xffff;
+				else
+					value = 0;
+			}
 
 			return(reply_short(value));
 		}
 
-		case(0x90): // read pwm
+		case(0x60): // write output	stepping min_value=uint16/scaled, max_value=uint16/scaled, step=uint16/scaled
 		{
-			if(input_io >= PWM_PORTS)
-				return(reply_error(3));
+			uint16_t low;
+			pwmport_t *port;
 
-			return(reply_short(pwm_timer1_get_pwm(input_io)));
-		}
-
-		case(0xa0): // write pwm mode
-		{
-			if(input_buffer_length < 2)
+			if(phy_receive_buffer_length != 7)
 				return(reply_error(4));
 
-			if(input_io >= PWM_PORTS)
+			if(input_io >= OUTPUT_PORTS)
 				return(reply_error(3));
 
-			if(input_buffer[1] > 3)
-				return(reply_error(3));
+			if(!output_ports[input_io].get)
+				return(reply_error(7));
 
-			pwm_meta[input_io].pwm_mode = input_buffer[1];
+			port = &output_ports[input_io];
 
-			return(reply_char(input_buffer[1]));
+			low = get_word(&phy_receive_buffer[1]);
+
+			port->limit_low		= low;
+			port->limit_high	= get_word(&phy_receive_buffer[3]);
+			port->current		= low;
+			port->step			= get_word(&phy_receive_buffer[5]);
+
+			return(reply_ok());
 		}
 
-		case(0xb0):	// read pwm mode
+		case(0x70):	// read output stepping min_value=uint16/scaled, max_value=uint16/scaled, step=uint16/scaled, current uint16/scaled
 		{
-			if(input_io >= PWM_PORTS)
+			uint8_t rv[8];
+			pwmport_t *port;
+
+			if(input_io >= OUTPUT_PORTS)
 				return(reply_error(3));
 
-			return(reply_char(pwm_meta[input_io].pwm_mode));
+			port = &output_ports[input_io];
+
+			put_word(port->limit_low, &rv[0]);
+			put_word(port->limit_high, &rv[2]);
+			put_word(port->step, &rv[4]);
+			put_word(port->current, &rv[6]);
+
+			return(reply(0, sizeof(rv), rv));
 		}
 
 		case(0xc0):	// select adc
@@ -678,7 +516,7 @@ static void process_command(uint8_t twi_input_buffer_length, const uint8_t *twi_
 			adc_samples = 0;
 			adc_value	= 0;
 
-			return(reply_char(input_io));
+			return(reply_ok());
 		}
 
 		case(0xd0):	// select temperature sensor
@@ -694,7 +532,7 @@ static void process_command(uint8_t twi_input_buffer_length, const uint8_t *twi_
 			temp_cal_multiplier = eeprom_read_uint16(&eeprom->temp_cal[input_io].multiplier);
 			temp_cal_offset		= eeprom_read_uint16(&eeprom->temp_cal[input_io].offset);
 
-			return(reply_char(input_io));
+			return(reply_ok());
 		}
 
 		case(0xe0):	// set temperature sensor calibration values
@@ -704,16 +542,16 @@ static void process_command(uint8_t twi_input_buffer_length, const uint8_t *twi_
 			if(input_io >= TEMP_PORTS)
 				return(reply_error(3));
 
-			if(input_buffer_length < 5)
+			if(phy_receive_buffer_length < 5)
 				return(reply_error(4));
 
-			value = get_word(&input_buffer[1]);
+			value = get_word(&phy_receive_buffer[1]);
 			eeprom_write_uint16(&eeprom->temp_cal[input_io].multiplier, value);
 
-			value = get_word(&input_buffer[3]);
+			value = get_word(&phy_receive_buffer[3]);
 			eeprom_write_uint16(&eeprom->temp_cal[input_io].offset, value);
 
-			return(reply_char(input_io));
+			return(reply_ok());
 		}
 
 		case(0xf0):	// read temperature sensor calibration values
@@ -742,20 +580,33 @@ static void process_command(uint8_t twi_input_buffer_length, const uint8_t *twi_
 	return(reply_error(2));
 }
 
-void twi_idle(void)
+void if_idle(void) // gets called ~500 Hz
 {
+	static uint16_t led_divisor = 0;
+
+	if(led_divisor > 1024) // 500 Hz / 1024 = 0.5 Hz = 2 sec
+	{
+		led_divisor = 0;
+
+		*internal_output_ports[1].port |= _BV(internal_output_ports[1].bit);
+		if_sense_led  = if_active_led_timeout;
+	}
+
+	led_divisor++;
+
 	if(adc_warmup > 0)
 	{
 		adc_warmup--;
 		adc_start();
-		return;
 	}
-
-	if(adc_ready() && (adc_samples < 1024))
+	else
 	{
-		adc_samples++;
-		adc_value += adc_read();
-		adc_start();
+		if(adc_ready() && (adc_samples < 1024))
+		{
+			adc_samples++;
+			adc_value += adc_read();
+			adc_start();
+		}
 	}
 
 	watchdog_reset();
@@ -787,34 +638,25 @@ int main(void)
 	for(slot = 0; slot < INPUT_PORTS; slot++)
 	{
 		*input_ports[slot].ddr			|=  _BV(input_ports[slot].bit);	// output
-		*input_ports[slot].port			&= ~_BV(input_ports[slot].bit);	// low
+		*input_ports[slot].port			&= ~_BV(input_ports[slot].bit); // low
 		*input_ports[slot].ddr			&= ~_BV(input_ports[slot].bit);	// input
 		*input_ports[slot].port			&= ~_BV(input_ports[slot].bit); // disable pullup
 		*input_ports[slot].pcmskreg		|=  _BV(input_ports[slot].pcmskbit);
+		input_ports[slot].state			=	*input_ports[slot].pin & _BV(input_ports[slot].bit);
+		input_ports[slot].counter		=	0;
 		GIMSK							|=  _BV(input_ports[slot].gimskbit);
-
-		counter_meta[slot].state		= *input_ports[slot].pin & _BV(input_ports[slot].bit);
-		counter_meta[slot].counter		= 0;
 	}
 
 	for(slot = 0; slot < OUTPUT_PORTS; slot++)
 	{
 		*output_ports[slot].ddr		|=  _BV(output_ports[slot].bit);
 		*output_ports[slot].port	&= ~_BV(output_ports[slot].bit);
-		softpwm_meta[slot].pwm_mode	= pwm_mode_none;
 	}
 
 	for(slot = 0; slot < INTERNAL_OUTPUT_PORTS; slot++)
 	{
 		*internal_output_ports[slot].ddr	|= _BV(internal_output_ports[slot].bit);
 		*internal_output_ports[slot].port	&= ~_BV(internal_output_ports[slot].bit);
-	}
-
-	for(slot = 0; slot < PWM_PORTS; slot++)
-	{
-		*pwm_ports[slot].ddr 		|=  _BV(pwm_ports[slot].bit);
-		*pwm_ports[slot].port		&= ~_BV(pwm_ports[slot].bit);
-		pwm_meta[slot].pwm_mode		= pwm_mode_none;
 	}
 
 	adc_init();
@@ -866,5 +708,5 @@ int main(void)
 
 	sei();
 
-	usi_twi_slave(0x02, 1, process_command, twi_idle);
+	usi_twi_slave(0x02, 1, process_input, if_idle);
 }

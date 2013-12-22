@@ -1,5 +1,5 @@
 #include <stdint.h>
-#include <avr/io.h>
+#include "avr.h"
 
 #include "ioports.h"
 #include "pwm_timer1.h"
@@ -99,83 +99,6 @@ void pwm_timer1_init(uint8_t prescaler)
 				(0 << ICF0);		// input capture flag timer0
 }
 
-uint16_t pwm_timer1_get_counter(void)
-{
-	uint16_t rv;
-
-	rv = TCNT1;
-	rv |= TC1H << 8;
-
-	return(rv);
-}
-
-void pwm_timer1_set_max(uint16_t max_value)
-{
-	TC1H	= (max_value & 0xff00) >> 8;
-	OCR1C	= (max_value & 0x00ff) >> 0;
-}
-
-uint16_t pwm_timer1_get_max(void)
-{
-	uint16_t rv;
-
-	rv = OCR1C;
-	rv |= TC1H << 8;
-
-	return(rv);
-}
-
-void pwm_timer1_set_pwm(uint8_t port, uint16_t pwm_value)
-{
-	if(port >= PWM_PORTS)
-		return;
-
-	const pwmport_t *slot = &pwm_ports[port];
-	
-	if((pwm_value == 0) || (pwm_value >= 0x3ff))
-	{
-		*slot->compare_reg_high	= 0;
-		*slot->compare_reg_low	= 0;
-		*slot->control_reg		&= ~(_BV(slot->com0_bit) | _BV(slot->com1_bit) | _BV(slot->pwm_bit));	// disconnnected
-
-		if(pwm_value == 0)
-			*slot->port &= ~_BV(slot->bit);
-		else
-			*slot->port |= _BV(slot->bit);
-	}
-	else
-	{
-		uint8_t control_reg_temp;
-
-		*slot->compare_reg_high	= pwm_value >> 8;
-		*slot->compare_reg_low	= pwm_value & 0xff;
-
-		control_reg_temp	= *slot->control_reg;
-		control_reg_temp	&= ~_BV(slot->com0_bit);	//	clear on match when counting up, set on match when counting down
-		control_reg_temp	|= _BV(slot->com1_bit) | _BV(slot->pwm_bit) | _BV(slot->foc_bit);	//	force immediate effect
-		*slot->control_reg	= control_reg_temp;
-	}
-}
-
-uint16_t pwm_timer1_get_pwm(uint8_t port)
-{
-	uint16_t rv;
-
-	if(port >= PWM_PORTS)
-		return(0xffff);
-
-	const pwmport_t *slot = &pwm_ports[port];
-
-	rv = *slot->compare_reg_low;
-	rv |= *slot->compare_reg_high << 8;
-
-
-	if((rv == 0) && (*slot->port & _BV(slot->bit)))
-		rv = 0x3ff;
-
-	return(rv);
-}
-
 void pwm_timer1_start(void)
 {
 	pwm_timer1_stop();
@@ -203,8 +126,128 @@ void pwm_timer1_stop(void)
 				(0		<< CS10);		// clock select bit 0
 }
 
-uint8_t pwm_timer1_status(void)
+#if (PWM_OUTPUT_PORTS > 0)
+void pwm_timer1_set_oc1a(uint16_t pwm_value)
 {
-	return((TCCR1B & (_BV(CS13) | _BV(CS12) | _BV(CS11) | _BV(CS10))) >> CS10);
+	if((pwm_value == 0) || (pwm_value > 0x3ff))
+	{
+		TC1H	= 0;
+		OCR1A	= 0;
+		TCCR1A 	&= ~(_BV(COM1A1) | _BV(COM1A0) | _BV(PWM1A));
+
+		if(pwm_value == 0)
+			*output_ports[0].port &= ~_BV(output_ports[0].bit);
+		else
+			*output_ports[0].port |= _BV(output_ports[0].bit);
+	}
+	else
+	{
+		uint8_t control_reg_temp;
+
+		TC1H	= pwm_value >> 8;
+		OCR1A	= pwm_value & 0xff;
+
+		control_reg_temp	= TCCR1A;
+		control_reg_temp	&= ~_BV(COM1A0);							//	clear on match when counting up, set on match when counting down
+		control_reg_temp	|= _BV(COM1A1) | _BV(PWM1A) | _BV(FOC1A);	//	force immediate effect
+		TCCR1A				= control_reg_temp;
+	}
 }
 
+uint16_t pwm_timer1_get_oc1a(void)
+{
+	uint16_t rv;
+
+	rv = OCR1A;
+	rv |= TC1H << 8;
+
+	if((rv == 0) && (*output_ports[0].port & _BV(output_ports[0].bit)))
+		rv = 0x3ff;
+
+	return(rv);
+}
+#endif
+
+#if (PWM_OUTPUT_PORTS > 1)
+void pwm_timer1_set_oc1b(uint16_t pwm_value)
+{
+	if((pwm_value == 0) || (pwm_value > 0x3ff))
+	{
+		TC1H	= 0;
+		OCR1B	= 0;
+		TCCR1A 	&= ~(_BV(COM1B1) | _BV(COM1B0) | _BV(PWM1B));
+
+		if(pwm_value == 0)
+			*output_ports[1].port &= ~_BV(output_ports[1].bit);
+		else
+			*output_ports[1].port |= _BV(output_ports[1].bit);
+	}
+	else
+	{
+		uint8_t control_reg_temp;
+
+		TC1H	= pwm_value >> 8;
+		OCR1B	= pwm_value & 0xff;
+
+		control_reg_temp	= TCCR1A;
+		control_reg_temp	&= ~_BV(COM1B0);							//	clear on match when counting up, set on match when counting down
+		control_reg_temp	|= _BV(COM1B1) | _BV(PWM1B) | _BV(FOC1B);	//	force immediate effect
+		TCCR1A				= control_reg_temp;
+	}
+}
+
+uint16_t pwm_timer1_get_oc1b(void)
+{
+	uint16_t rv;
+
+	rv = OCR1B;
+	rv |= TC1H << 8;
+
+	if((rv == 0) && (*output_ports[1].port & _BV(output_ports[1].bit)))
+		rv = 0x3ff;
+
+	return(rv);
+}
+#endif
+
+#if (PWM_OUTPUT_PORTS > 2)
+void pwm_timer1_set_oc1d(uint16_t pwm_value)
+{
+	if((pwm_value == 0) || (pwm_value > 0x3ff))
+	{
+		TC1H	= 0;
+		OCR1D	= 0;
+		TCCR1C 	&= ~(_BV(COM1D1) | _BV(COM1D0) | _BV(PWM1D));
+
+		if(pwm_value == 0)
+			*output_ports[2].port &= ~_BV(output_ports[2].bit);
+		else
+			*output_ports[2].port |= _BV(output_ports[2].bit);
+	}
+	else
+	{
+		uint8_t control_reg_temp;
+
+		TC1H	= pwm_value >> 8;
+		OCR1D	= pwm_value & 0xff;
+
+		control_reg_temp	= TCCR1C;
+		control_reg_temp	&= ~_BV(COM1D0);							//	clear on match when counting up, set on match when counting down
+		control_reg_temp	|= _BV(COM1D1) | _BV(PWM1D) | _BV(FOC1D);	//	force immediate effect
+		TCCR1C				= control_reg_temp;
+	}
+}
+
+uint16_t pwm_timer1_get_oc1d(void)
+{
+	uint16_t rv;
+
+	rv = OCR1D;
+	rv |= TC1H << 8;
+
+	if((rv == 0) && (*output_ports[2].port & _BV(output_ports[2].bit)))
+		rv = 0x3ff;
+
+	return(rv);
+}
+#endif
